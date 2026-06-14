@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 360" role="img" aria-label="United Trade Co. — For Poultry Packaging & Equipment — Est. 1978 — The Glory of Experience">
+  <defs>
+    <style>
+      .gold { fill: #C28E0E; }
+      .ink  { fill: #1A1A1A; }
+      .gray { fill: #6B6B6B; }
+      .wm   { font-family: 'Arial Black', Arial, sans-serif; }
+      .sans { font-family: Arial, sans-serif; }
+    </style>
+  </defs>
+
+  <!-- ===== Top line: EST. — [rooster + UTC] — 1978 ===== -->
+  <text x="92" y="150" class="sans" font-size="22" font-weight="700" fill="#777" text-anchor="middle">EST.</text>
+  <line x1="120" y1="143" x2="205" y2="143" stroke="#C28E0E" stroke-width="2.5"/>
+  <line x1="478" y1="143" x2="560" y2="143" stroke="#C28E0E" stroke-width="2.5"/>
+  <text x="592" y="150" class="sans" font-size="22" font-weight="700" fill="#777" text-anchor="middle">1978</text>
+
+  <!-- rooster mark (gold), facing left, perched left of the U -->
+  <g class="gold">
+    <!-- comb -->
+    <path d="M226 104 C229 90 240 92 241 102 C244 88 255 92 254 104 C260 98 266 104 262 110 L228 112 Z"/>
+    <!-- head -->
+    <ellipse cx="241" cy="121" rx="20" ry="22"/>
+    <!-- beak -->
+    <path d="M223 116 L203 122 L223 129 Z"/>
+    <!-- wattle -->
+    <ellipse cx="224" cy="134" rx="4.5" ry="8.5"/>
+    <!-- tail accent -->
+    <path d="M258 104 C272 100 276 116 264 122 C268 112 263 108 256 110 Z"/>
+  </g>
+  <circle cx="247" cy="115" r="2.6" class="ink"/>
+
+  <!-- UTC wordmark -->
+  <text x="358" y="160" class="wm gold" font-size="120" font-weight="900" text-anchor="middle">UTC</text>
+
+  <!-- ===== Company name ===== -->
+  <text x="340" y="236" class="wm ink" font-size="52" font-weight="900" text-anchor="middle">UNITED TRADE CO.<tspan font-size="20" dy="-22">&#174;</tspan></text>
+
+  <!-- ===== Tagline ===== -->
+  <text x="340" y="272" class="sans gold" font-size="18" font-weight="700" letter-spacing="3" text-anchor="middle">FOR POULTRY PACKAGING &amp; EQUIPMENT</text>
+
+  <!-- ===== Slogan ===== -->
+  <text x="340" y="322" class="sans" font-size="24" text-anchor="middle">
+    <tspan class="gray">The </tspan><tspan class="gold" font-weight="700">Glory</tspan><tspan class="gray"> of </tspan><tspan class="gold" font-weight="700">Experience</tspan>
+  </text>
+</svg>

@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 230 130" role="img" aria-label="UTC">
+  <g fill="#C28E0E">
+    <!-- comb -->
+    <path d="M30 30 C33 14 46 16 47 28 C50 12 63 16 62 30 C69 23 76 30 71 37 L32 39 Z"/>
+    <!-- head -->
+    <ellipse cx="47" cy="50" rx="23" ry="25"/>
+    <!-- beak -->
+    <path d="M26 44 L4 51 L26 59 Z"/>
+    <!-- wattle -->
+    <ellipse cx="27" cy="64" rx="5" ry="10"/>
+    <!-- tail accent -->
+    <path d="M66 30 C82 25 87 43 73 50 C78 39 72 34 64 37 Z"/>
+  </g>
+  <circle cx="54" cy="43" r="3" fill="#1A1A1A"/>
+  <text x="148" y="92" font-family="'Arial Black', Arial, sans-serif" font-size="92" font-weight="900" fill="#C28E0E" text-anchor="middle">UTC</text>
+</svg>

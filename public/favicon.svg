@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <rect width="64" height="64" rx="12" fill="#1A1A1A"/>
+  <g fill="#C28E0E">
+    <!-- comb -->
+    <path d="M16 18 C17.5 10 24 11 24.5 17 C26 9 32.5 11 32 18 C35.5 14.5 39 18 36.5 21.5 L17 22.5 Z"/>
+    <!-- head -->
+    <ellipse cx="24.5" cy="28" rx="11.5" ry="12.5"/>
+    <!-- beak -->
+    <path d="M14 25 L3 28.5 L14 32.5 Z"/>
+    <!-- wattle -->
+    <ellipse cx="14.5" cy="35" rx="2.6" ry="5"/>
+  </g>
+  <circle cx="28" cy="24" r="1.6" fill="#1A1A1A"/>
+  <text x="34" y="54" font-family="Arial, sans-serif" font-size="20" font-weight="900" fill="#C28E0E" text-anchor="middle">UTC</text>
+</svg>
