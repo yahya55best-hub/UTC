@@ -2,7 +2,7 @@ import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import { loadLogo } from './pdf'
 import { formatDate } from './format'
-import type { CalcResult } from './calc'
+import { orderedSections, type CalcResult } from './calc'
 import type { Customer, LightingPlan, Quote } from './types'
 
 const GOLD: [number, number, number] = [201, 151, 0]
@@ -73,7 +73,7 @@ export async function generateBoqPdf(args: {
   y = doc.lastAutoTable.finalY + 16
 
   // Computed metrics with formulas, grouped by section
-  const sections = Array.from(new Set([...result.metrics.map((m) => m.section), ...result.proposals.map((p) => p.section)]))
+  const sections = orderedSections([...result.metrics.map((m) => m.section), ...result.proposals.map((p) => p.section)])
   const bodyRows: (string | { content: string; colSpan?: number; styles?: object })[][] = []
   for (const sec of sections) {
     bodyRows.push([{ content: sec, colSpan: 3, styles: { fillColor: [250, 248, 240], fontStyle: 'bold', textColor: GOLD } }])
