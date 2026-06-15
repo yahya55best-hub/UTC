@@ -7,6 +7,7 @@ import { useCatalog, variantsFor } from '../lib/hooks'
 import { resolveUnitPrice, currentCommissionPercent } from '../lib/pricing'
 import { money, todayISO, addDaysISO } from '../lib/format'
 import { generateQuotePdf } from '../lib/pdf'
+import { generateQuotePdfHtml } from '../lib/pdfHtml'
 import { PageHeader, Spinner, Field, Modal } from '../components/ui'
 import { CustomerForm } from '../components/CustomerForm'
 import { HouseSizingPanel, type CalcSnapshot } from '../components/HouseSizingPanel'
@@ -319,7 +320,7 @@ export function QuoteEditorPage() {
     }
   }
 
-  async function downloadPdf() {
+  async function downloadPdf(lang: 'en' | 'ar') {
     const customer = customers.find((c) => c.id === customerId)
     if (!customer) {
       setError(t('quote.needCustomer'))
@@ -364,7 +365,11 @@ export function QuoteEditorPage() {
       created_at: '',
       updated_at: '',
     }))
-    await generateQuotePdf({ quote: quoteObj, customer, lines: lineObjs, currency })
+    if (lang === 'ar') {
+      await generateQuotePdfHtml({ quote: quoteObj, customer, lines: lineObjs, currency, lang: 'ar' })
+    } else {
+      await generateQuotePdf({ quote: quoteObj, customer, lines: lineObjs, currency })
+    }
   }
 
   if (loading || catalog.loading) return <Spinner />
@@ -376,8 +381,11 @@ export function QuoteEditorPage() {
         subtitle={t('quote.builder')}
         action={
           <div className="flex gap-2">
-            <button className="btn-outline" onClick={downloadPdf}>
-              ⬇ {t('quote.exportPdf')}
+            <button className="btn-outline" onClick={() => downloadPdf('en')}>
+              ⬇ {t('quote.exportPdf')} (EN)
+            </button>
+            <button className="btn-outline" onClick={() => downloadPdf('ar')}>
+              ⬇ {t('quote.exportPdf')} (AR)
             </button>
             <button className="btn-primary" onClick={save} disabled={saving}>
               {saving ? t('common.saving') : isNew ? t('quote.saveDraft') : t('common.save')}

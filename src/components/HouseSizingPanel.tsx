@@ -1,7 +1,10 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useEngineTables } from '../lib/hooks'
-import { runEngine, type CalcInputs, type CalcResult, type Proposal, type EngineData } from '../lib/calc'
+import {
+  runEngine, orderedSections,
+  type CalcInputs, type CalcResult, type Proposal, type EngineData,
+} from '../lib/calc'
 import { generateBoqPdf } from '../lib/boqPdf'
 import { Field, Spinner } from './ui'
 import type { Brand, Customer, LightingPlan, Quote } from '../lib/types'
@@ -44,6 +47,26 @@ export function HouseSizingPanel({
   const [edited, setEdited] = useState<Proposal[]>([])
   const [selected, setSelected] = useState<Record<string, boolean>>({})
   const [lighting, setLighting] = useState<LightingPlan>(blankLighting())
+
+  // Auto-select sensible default equipment models once the tables load, so the
+  // first calculation already covers every category (fans, inlets, pads, …).
+  useEffect(() => {
+    if (eng.loading) return
+    setInp((p) => ({
+      ...p,
+      tunnel_fan_model_id:
+        p.tunnel_fan_model_id ??
+        eng.fans.find((f) => (f.fan_type === 'TUNNEL' || f.fan_type === 'EXHAUST') && f.capacity_m3h != null)?.id,
+      side_fan_model_id:
+        p.side_fan_model_id ?? eng.fans.find((f) => f.fan_type === 'SIDE' && f.capacity_m3h != null)?.id,
+      recirc_fan_model_id: p.recirc_fan_model_id ?? eng.fans.find((f) => f.fan_type === 'CIRCULATION')?.id,
+      cooling_pad_model_id: p.cooling_pad_model_id ?? eng.pads[0]?.id,
+      heater_model_id: p.heater_model_id ?? eng.heaters[0]?.id,
+      air_inlet_model_id:
+        p.air_inlet_model_id ?? eng.inlets.find((m) => m.airflow_per_inlet_m3h != null)?.id,
+    }))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [eng.loading])
 
   const engineData: EngineData = useMemo(
     () => ({
@@ -91,7 +114,7 @@ export function HouseSizingPanel({
   const sideFans = eng.fans.filter((f) => f.fan_type === 'SIDE')
   const recircFans = eng.fans.filter((f) => f.fan_type === 'CIRCULATION')
   const sections = result
-    ? Array.from(new Set([...result.metrics.map((m) => m.section), ...edited.map((p) => p.section)]))
+    ? orderedSections([...result.metrics.map((m) => m.section), ...edited.map((p) => p.section)])
     : []
 
   return (

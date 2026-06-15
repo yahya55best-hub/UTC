@@ -99,6 +99,27 @@ export interface CalcResult {
   warnings: string[]
 }
 
+/** Fixed display order so results are always grouped logically. */
+export const SECTION_ORDER = [
+  'House',
+  'Bird capacity',
+  'Caged system',
+  'Feeding & drinking',
+  'Ventilation',
+  'Cooling',
+  'Heating',
+  'Lighting',
+]
+
+/** Return the distinct sections present in a result, in SECTION_ORDER. */
+export function orderedSections(sections: string[]): string[] {
+  const present = new Set(sections)
+  const ordered = SECTION_ORDER.filter((s) => present.has(s))
+  // append any unexpected sections at the end (defensive)
+  for (const s of sections) if (!SECTION_ORDER.includes(s) && !ordered.includes(s)) ordered.push(s)
+  return ordered
+}
+
 function settingMap(settings: CalcSetting[]): (key: string, fallback?: number) => number {
   const m = new Map(settings.map((s) => [s.key, s.value]))
   return (key, fallback = 0) => {
@@ -216,7 +237,7 @@ export function runEngine(input: CalcInputs, data: EngineData): CalcResult {
   const totalFeed = feedLines * L
   if (feedLines > 0) {
     addProposal(
-      proposals, 'Feed system', 'Feeding line', input.feed_brand ?? 'UTC.stav',
+      proposals, 'Feeding & drinking', 'Feeding line', input.feed_brand ?? 'UTC.stav',
       'Feeding line', 'PER_METER', round(totalFeed, 1),
       `${W >= 11 && W <= 13 ? '11–13 m' : '>13 m'} → ${feedLines} lines × ${fmt(L)} m = ${fmt(totalFeed, 1)} m`,
     )
@@ -231,12 +252,12 @@ export function runEngine(input: CalcInputs, data: EngineData): CalcResult {
   const totalWater = waterLines * L
   if (waterLines > 0) {
     addProposal(
-      proposals, 'Drinking system', 'Drinking line', input.water_brand ?? 'UTC.stav',
+      proposals, 'Feeding & drinking', 'Drinking line', input.water_brand ?? 'UTC.stav',
       'Drinking line', 'PER_METER', round(totalWater, 1),
       `${W >= 11 && W <= 13 ? '11–13 m' : '>13 m'} → ${waterLines} lines × ${fmt(L)} m = ${fmt(totalWater, 1)} m`,
     )
     metrics.push({
-      section: 'Drinking system',
+      section: 'Feeding & drinking',
       label: 'Total nipples',
       value: waterLines * nipplesPerLine,
       unit: 'nipples',
@@ -250,7 +271,7 @@ export function runEngine(input: CalcInputs, data: EngineData): CalcResult {
   const openingArea = round(W * openH, 2)
   const tunnelAirflow = round(openingArea * speed * 3600)
   metrics.push({
-    section: 'Tunnel ventilation',
+    section: 'Ventilation',
     label: 'Tunnel airflow',
     value: tunnelAirflow,
     unit: 'm³/h',
@@ -263,7 +284,7 @@ export function runEngine(input: CalcInputs, data: EngineData): CalcResult {
     } else {
       const count = ceil(tunnelAirflow / tunnelFan.capacity_m3h)
       addProposal(
-        proposals, 'Tunnel ventilation', 'Tunnel fans', brandName(data, tunnelFan.brand_id),
+        proposals, 'Ventilation', 'Tunnel fans', brandName(data, tunnelFan.brand_id),
         `${tunnelFan.name} — tunnel fan`, 'PER_UNIT', count,
         `ceil(${fmt(tunnelAirflow)} / ${fmt(tunnelFan.capacity_m3h)}) = ${count}`,
       )
@@ -277,14 +298,14 @@ export function runEngine(input: CalcInputs, data: EngineData): CalcResult {
   const padArea = round(tunnelAirflow / (faceVel * 3600), 1)
   const padLength = round(padArea / padHeight, 1)
   metrics.push({
-    section: 'Cooling pad',
+    section: 'Cooling',
     label: 'Pad area',
     value: padArea,
     unit: 'm²',
     formula: `${fmt(tunnelAirflow)} / (${faceVel} × 3600) = ${fmt(padArea, 1)} m²`,
   })
   metrics.push({
-    section: 'Cooling pad',
+    section: 'Cooling',
     label: 'Pad length',
     value: padLength,
     unit: 'm',
@@ -294,7 +315,7 @@ export function runEngine(input: CalcInputs, data: EngineData): CalcResult {
   if (pad) {
     const sheets = ceil(padArea / pad.sheet_face_area_m2)
     addProposal(
-      proposals, 'Cooling pad', 'Cooling pad sheets', brandName(data, pad.brand_id),
+      proposals, 'Cooling', 'Cooling pad sheets', brandName(data, pad.brand_id),
       `${pad.name}`, 'PER_UNIT', sheets,
       `ceil(${fmt(padArea, 1)} / ${pad.sheet_face_area_m2}) = ${sheets}`,
     )
@@ -302,7 +323,7 @@ export function runEngine(input: CalcInputs, data: EngineData): CalcResult {
   const channelLen = get('channel_unit_len_m', 3)
   const channels = ceil(padLength / channelLen)
   addProposal(
-    proposals, 'Cooling pad', 'Cooling-pad channel (PVC, 3 m)', 'UTC.stav',
+    proposals, 'Cooling', 'Cooling-pad channel (PVC, 3 m)', 'UTC.stav',
     'Cooling-pad PVC channel', 'PER_UNIT', channels,
     `ceil(${fmt(padLength, 1)} / ${channelLen}) = ${channels}`,
   )
@@ -313,7 +334,7 @@ export function runEngine(input: CalcInputs, data: EngineData): CalcResult {
   if (birds != null) {
     requiredSide = round(birdReq * birds)
     metrics.push({
-      section: 'Side ventilation',
+      section: 'Ventilation',
       label: 'Required side airflow',
       value: requiredSide,
       unit: 'm³/h',
@@ -326,7 +347,7 @@ export function runEngine(input: CalcInputs, data: EngineData): CalcResult {
       } else {
         const count = ceil(requiredSide / sideFan.capacity_m3h)
         addProposal(
-          proposals, 'Side ventilation', 'Side fans', brandName(data, sideFan.brand_id),
+          proposals, 'Ventilation', 'Side fans', brandName(data, sideFan.brand_id),
           `${sideFan.name} — side fan`, 'PER_UNIT', count,
           `ceil(${fmt(requiredSide)} / ${fmt(sideFan.capacity_m3h)}) = ${count}`,
         )
@@ -345,7 +366,7 @@ export function runEngine(input: CalcInputs, data: EngineData): CalcResult {
       const perSide = ceil(requiredSide / inlet.airflow_per_inlet_m3h)
       const total = perSide * 2
       addProposal(
-        proposals, 'Air inlets', 'Side air inlets (both sides)', brandName(data, inlet.brand_id),
+        proposals, 'Ventilation', 'Side air inlets (both sides)', brandName(data, inlet.brand_id),
         `${inlet.name} — air inlet`, 'PER_UNIT', total,
         `ceil(${fmt(requiredSide)} / ${fmt(inlet.airflow_per_inlet_m3h)}) × 2 = ${total}`,
       )
@@ -357,7 +378,7 @@ export function runEngine(input: CalcInputs, data: EngineData): CalcResult {
   const recircCount = ceil(L / recircSpacing)
   const recircFan = data.fans.find((f) => f.id === input.recirc_fan_model_id)
   addProposal(
-    proposals, 'Recirculation', 'Recirculation fans', recircFan ? brandName(data, recircFan.brand_id) : 'Pericoli',
+    proposals, 'Ventilation', 'Recirculation fans', recircFan ? brandName(data, recircFan.brand_id) : 'Pericoli',
     recircFan ? `${recircFan.name} — recirc fan` : 'Recirculation fan', 'PER_UNIT', recircCount,
     `ceil(${fmt(L)} / ${recircSpacing}) = ${recircCount}`,
   )
