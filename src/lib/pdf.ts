@@ -1,6 +1,7 @@
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import { money, formatDate } from './format'
+import { asset } from './asset'
 import type { Currency, Customer, Quote, QuoteLine } from './types'
 
 const GOLD: [number, number, number] = [201, 151, 0]
@@ -22,7 +23,7 @@ const HOUSE_LABEL: Record<string, string> = {
 
 /** Load an image (PNG preferred, SVG fallback) and return a PNG data URL. */
 export async function loadLogo(): Promise<{ dataUrl: string; w: number; h: number } | null> {
-  for (const src of ['/UTC_logo_correct.jpeg', '/logo.png', '/logo.svg']) {
+  for (const src of ['UTC_logo_correct.jpeg', 'logo.png', 'logo.svg'].map(asset)) {
     try {
       const dataUrl = await toDataUrl(src)
       if (dataUrl) {

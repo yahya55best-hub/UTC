@@ -5,6 +5,7 @@ import {
   WidthType, AlignmentType, ImageRun, ShadingType,
 } from 'docx'
 import { money, formatDate } from './format'
+import { asset } from './asset'
 import en from '../i18n/en.json'
 import ar from '../i18n/ar.json'
 import type { Currency, Customer, Quote, QuoteLine } from './types'
@@ -86,7 +87,7 @@ function buildContainer({ quote, customer, lines, currency, lang }: QuoteExportA
   c.style.cssText = `position:absolute;left:-10000px;top:0;width:780px;background:#fff;color:#1A1A1A;font-family:${font};padding:32px;box-sizing:border-box;direction:${dir}`
   c.innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #C28E0E;padding-bottom:14px;margin-bottom:18px">
-      <img src="/logo.png" style="height:62px;width:auto" />
+      <img src="${asset('logo.png')}" style="height:62px;width:auto" />
       <div style="text-align:${eA}">
         <div style="font-size:18px;font-weight:800">${escapeHtml(L.app.name)}</div>
         <div style="font-size:11px;color:#6B6B6B">${escapeHtml(L.app.tagline)}</div>
@@ -132,7 +133,7 @@ function buildContainer({ quote, customer, lines, currency, lang }: QuoteExportA
 }
 
 export async function downloadQuotePdf(args: QuoteExportArgs): Promise<void> {
-  await preload('/logo.png')
+  await preload(asset('logo.png'))
   const container = buildContainer(args)
   document.body.appendChild(container)
   try {
@@ -238,7 +239,7 @@ export async function downloadQuoteDocx({ quote, customer, lines, currency, lang
   // logo
   let logoPara: Paragraph | null = null
   try {
-    const buf = await fetch('/logo.png').then((r) => r.arrayBuffer())
+    const buf = await fetch(asset('logo.png')).then((r) => r.arrayBuffer())
     logoPara = new Paragraph({
       alignment: AlignmentType.CENTER,
       children: [new ImageRun({ type: 'png', data: buf, transformation: { width: 150, height: 144 } })],

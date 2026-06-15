@@ -2,6 +2,7 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../auth/AuthProvider'
 import { LanguageToggle } from './LanguageToggle'
+import { asset } from '../lib/asset'
 
 function navClass({ isActive }: { isActive: boolean }) {
   return [
@@ -26,11 +27,11 @@ export function Layout() {
       <header className="sticky top-0 z-30 flex items-center justify-between border-b border-black/5 bg-white px-4 py-3 shadow-sm">
         <div className="flex items-center gap-3">
           <img
-            src="/logo.png"
+            src={asset('logo.png')}
             alt="UTC"
             className="h-11 w-auto"
             onError={(e) => {
-              if (!e.currentTarget.src.endsWith('/logo-mark.svg')) e.currentTarget.src = '/logo-mark.svg'
+              if (!e.currentTarget.src.endsWith('logo-mark.svg')) e.currentTarget.src = asset('logo-mark.svg')
             }}
           />
           <div className="hidden sm:block">

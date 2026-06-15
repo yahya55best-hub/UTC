@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { useAuth } from '../auth/AuthProvider'
 import { Spinner } from './ui'
 import { LanguageToggle } from './LanguageToggle'
+import { asset } from '../lib/asset'
 
 export function RequireAuth({ children }: { children: ReactNode }) {
   const { session, loading, profile } = useAuth()
@@ -35,7 +36,7 @@ function PendingApproval() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-[#FAF9F6] p-4">
       <div className="w-full max-w-md text-center">
-        <img src="/logo.png" alt="UTC" className="mx-auto mb-6 w-56 max-w-full" onError={(e) => { e.currentTarget.src = '/logo.svg' }} />
+        <img src={asset('logo.png')} alt="UTC" className="mx-auto mb-6 w-56 max-w-full" onError={(e) => { e.currentTarget.src = asset('logo.svg') }} />
         <div className="card p-8">
           <div className="mb-3 text-4xl">⏳</div>
           <h1 className="mb-2 text-xl font-bold text-ink">{t('auth.pendingTitle')}</h1>

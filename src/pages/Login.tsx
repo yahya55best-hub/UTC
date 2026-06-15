@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { useAuth } from '../auth/AuthProvider'
 import { isConfigured } from '../lib/supabase'
 import { LanguageToggle } from '../components/LanguageToggle'
+import { asset } from '../lib/asset'
 
 export function LoginPage() {
   const { t } = useTranslation()
@@ -125,11 +126,11 @@ function Shell({ children }: { children: React.ReactNode }) {
       <div className="w-full max-w-md">
         <div className="mb-6 flex flex-col items-center text-center">
           <img
-            src="/logo.png"
+            src={asset('logo.png')}
             alt="United Trade Co."
             className="w-72 max-w-full"
             onError={(e) => {
-              if (!e.currentTarget.src.endsWith('/logo.svg')) e.currentTarget.src = '/logo.svg'
+              if (!e.currentTarget.src.endsWith('logo.svg')) e.currentTarget.src = asset('logo.svg')
             }}
           />
         </div>
