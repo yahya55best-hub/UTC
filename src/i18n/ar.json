@@ -52,6 +52,18 @@
     "priceAdmin": "الكتالوج والأسعار",
     "fxRates": "أسعار الصرف"
   },
+  "users": {
+    "title": "المستخدمون",
+    "role": "الدور",
+    "active": "مفعّل",
+    "pending": "بانتظار",
+    "approve": "موافقة",
+    "deactivate": "إلغاء التفعيل",
+    "you": "أنت",
+    "cantSelf": "لا يمكنك إلغاء تفعيل حسابك",
+    "pendingCount": "{{count}} حساب بانتظار الموافقة",
+    "allActive": "جميع الحسابات مفعّلة"
+  },
   "auth": {
     "login": "تسجيل الدخول",
     "signup": "إنشاء حساب",
@@ -67,7 +79,9 @@
     "checkEmail": "تحقق من بريدك لتأكيد الحساب ثم سجّل الدخول.",
     "signupRejected": "التسجيل مقصور على نطاقات بريد الشركة المعتمدة.",
     "configTitle": "لم يتم إعداد Supabase",
-    "configBody": "اضبط VITE_SUPABASE_URL و VITE_SUPABASE_ANON_KEY في ملف ‎.env‎ ثم أعد تشغيل الخادم. راجع ملف README."
+    "configBody": "اضبط VITE_SUPABASE_URL و VITE_SUPABASE_ANON_KEY في ملف ‎.env‎ ثم أعد تشغيل الخادم. راجع ملف README.",
+    "pendingTitle": "الحساب بانتظار الموافقة",
+    "pendingBody": "تم إنشاء حسابك وهو بانتظار موافقة المسؤول. ستتمكن من تسجيل الدخول بمجرد تفعيله."
   },
   "roles": { "OWNER": "المالك", "ADMIN": "الإدارة / المالية", "SALES": "المبيعات" },
   "dashboard": {

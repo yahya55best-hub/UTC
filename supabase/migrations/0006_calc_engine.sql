@@ -193,6 +193,7 @@ insert into public.calc_settings (key, value, unit, category, description) value
   -- Cooling pad (C.6)
   ('pad_face_velocity_ms',   1.30, 'm/s',     'cooling',  'Pad face velocity (preferred 1.25–1.40, MAX 1.5)'),
   ('pad_height_m',           1.5,  'm',       'cooling',  'Cooling pad height'),
+  ('cooling_pad_sides',      2,    'sides',   'cooling',  'Number of walls the pads run on (2 = both sides). Scales pad area/length/sheets/channel.'),
   ('channel_unit_len_m',     3.0,  'm',       'cooling',  'PVC cooling-pad channel unit length'),
   -- Side ventilation + inlets (C.7, C.8)
   ('bird_requirement_m3h_per_bird', 4.0, 'm3/h/bird', 'ventilation', 'Minimum ventilation per bird (DEFAULT — engineer to confirm by age/weight)'),

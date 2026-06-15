@@ -6,8 +6,7 @@ import { useAuth } from '../auth/AuthProvider'
 import { useCatalog, variantsFor } from '../lib/hooks'
 import { resolveUnitPrice, currentCommissionPercent } from '../lib/pricing'
 import { money, todayISO, addDaysISO } from '../lib/format'
-import { generateQuotePdf } from '../lib/pdf'
-import { generateQuotePdfHtml } from '../lib/pdfHtml'
+import { downloadQuotePdf, downloadQuoteDocx } from '../lib/quoteExport'
 import { PageHeader, Spinner, Field, Modal } from '../components/ui'
 import { CustomerForm } from '../components/CustomerForm'
 import { HouseSizingPanel, type CalcSnapshot } from '../components/HouseSizingPanel'
@@ -54,6 +53,7 @@ export function QuoteEditorPage() {
   const [creatingCustomer, setCreatingCustomer] = useState(false)
   const [showCalc, setShowCalc] = useState(false)
   const [calcSnap, setCalcSnap] = useState<CalcSnapshot | null>(null)
+  const [dlOpen, setDlOpen] = useState(false)
 
   // quote header state
   const [customerId, setCustomerId] = useState<string>('')
@@ -320,7 +320,7 @@ export function QuoteEditorPage() {
     }
   }
 
-  async function downloadPdf(lang: 'en' | 'ar') {
+  async function downloadDoc(format: 'pdf' | 'docx', lang: 'en' | 'ar') {
     const customer = customers.find((c) => c.id === customerId)
     if (!customer) {
       setError(t('quote.needCustomer'))
@@ -365,11 +365,9 @@ export function QuoteEditorPage() {
       created_at: '',
       updated_at: '',
     }))
-    if (lang === 'ar') {
-      await generateQuotePdfHtml({ quote: quoteObj, customer, lines: lineObjs, currency, lang: 'ar' })
-    } else {
-      await generateQuotePdf({ quote: quoteObj, customer, lines: lineObjs, currency })
-    }
+    const payload = { quote: quoteObj, customer, lines: lineObjs, currency, lang }
+    if (format === 'pdf') await downloadQuotePdf(payload)
+    else await downloadQuoteDocx(payload)
   }
 
   if (loading || catalog.loading) return <Spinner />
@@ -381,12 +379,35 @@ export function QuoteEditorPage() {
         subtitle={t('quote.builder')}
         action={
           <div className="flex gap-2">
-            <button className="btn-outline" onClick={() => downloadPdf('en')}>
-              ⬇ {t('quote.exportPdf')} (EN)
-            </button>
-            <button className="btn-outline" onClick={() => downloadPdf('ar')}>
-              ⬇ {t('quote.exportPdf')} (AR)
-            </button>
+            <div className="relative">
+              <button className="btn-outline" onClick={() => setDlOpen((o) => !o)}>
+                ⬇ {t('common.download')} ▾
+              </button>
+              {dlOpen && (
+                <div
+                  className="absolute end-0 z-30 mt-1 w-48 overflow-hidden rounded-lg border border-black/10 bg-white shadow-lg"
+                  onMouseLeave={() => setDlOpen(false)}
+                >
+                  {([
+                    ['pdf', 'en', 'PDF — English'],
+                    ['pdf', 'ar', 'PDF — العربية'],
+                    ['docx', 'en', 'Word — English'],
+                    ['docx', 'ar', 'Word — العربية'],
+                  ] as const).map(([fmt, lng, label]) => (
+                    <button
+                      key={`${fmt}-${lng}`}
+                      className="block w-full px-3 py-2 text-start text-sm text-ink-soft hover:bg-gold-50"
+                      onClick={() => {
+                        setDlOpen(false)
+                        downloadDoc(fmt, lng)
+                      }}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
             <button className="btn-primary" onClick={save} disabled={saving}>
               {saving ? t('common.saving') : isNew ? t('quote.saveDraft') : t('common.save')}
             </button>

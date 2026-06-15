@@ -1,4 +1,4 @@
-import { BrowserRouter, Route, Routes, Navigate } from 'react-router-dom'
+import { HashRouter, Route, Routes, Navigate } from 'react-router-dom'
 import { AuthProvider } from './auth/AuthProvider'
 import { Layout } from './components/Layout'
 import { RequireAdmin, RequireAuth } from './components/Guards'
@@ -12,11 +12,12 @@ import { QuoteEditorPage } from './pages/QuoteEditor'
 import { AdminOverviewPage } from './pages/AdminOverview'
 import { CatalogAdminPage } from './pages/CatalogAdmin'
 import { CalcAdminPage } from './pages/CalcAdmin'
+import { UsersAdminPage } from './pages/UsersAdmin'
 
 export default function App() {
   return (
     <AuthProvider>
-      <BrowserRouter>
+      <HashRouter>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route
@@ -57,10 +58,18 @@ export default function App() {
                 </RequireAdmin>
               }
             />
+            <Route
+              path="/admin/users"
+              element={
+                <RequireAdmin>
+                  <UsersAdminPage />
+                </RequireAdmin>
+              }
+            />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
-      </BrowserRouter>
+      </HashRouter>
     </AuthProvider>
   )
 }

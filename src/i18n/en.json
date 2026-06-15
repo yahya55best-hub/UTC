@@ -52,6 +52,18 @@
     "priceAdmin": "Catalog & Prices",
     "fxRates": "FX Rates"
   },
+  "users": {
+    "title": "Users",
+    "role": "Role",
+    "active": "Active",
+    "pending": "Pending",
+    "approve": "Approve",
+    "deactivate": "Deactivate",
+    "you": "you",
+    "cantSelf": "You can't deactivate your own account",
+    "pendingCount": "{{count}} account(s) awaiting approval",
+    "allActive": "All accounts are active"
+  },
   "auth": {
     "login": "Log in",
     "signup": "Sign up",
@@ -67,7 +79,9 @@
     "checkEmail": "Check your inbox to confirm your email, then log in.",
     "signupRejected": "Signups are restricted to approved company email domains.",
     "configTitle": "Supabase is not configured",
-    "configBody": "Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env file, then restart the dev server. See the README."
+    "configBody": "Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env file, then restart the dev server. See the README.",
+    "pendingTitle": "Account awaiting approval",
+    "pendingBody": "Your account has been created and is waiting for an administrator to approve it. You'll be able to sign in once it's activated."
   },
   "roles": { "OWNER": "Owner", "ADMIN": "Admin / Finance", "SALES": "Sales" },
   "dashboard": {

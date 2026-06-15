@@ -83,6 +83,9 @@ export function Layout() {
                 <NavLink to="/admin/calc" className={navClass}>
                   📐 <span>{t('calc.settings')}</span>
                 </NavLink>
+                <NavLink to="/admin/users" className={navClass}>
+                  👥 <span>{t('users.title')}</span>
+                </NavLink>
               </>
             )}
           </nav>

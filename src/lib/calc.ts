@@ -292,24 +292,28 @@ export function runEngine(input: CalcInputs, data: EngineData): CalcResult {
   }
 
   // ---- Cooling pads (Addendum C.6 / D.5) -----------------------------------
+  // Pads run on both side walls by default (cooling_pad_sides = 2). The
+  // airflow-derived area is the per-side requirement; total scales by sides.
+  const padSides = get('cooling_pad_sides', 2)
   const faceVel = get('pad_face_velocity_ms', 1.3)
   if (faceVel > 1.5) warnings.push(`Pad face velocity ${faceVel} m/s exceeds the 1.5 m/s maximum.`)
   const padHeight = get('pad_height_m', 1.5)
-  const padArea = round(tunnelAirflow / (faceVel * 3600), 1)
+  const padAreaPerSide = tunnelAirflow / (faceVel * 3600)
+  const padArea = round(padAreaPerSide * padSides, 1)
   const padLength = round(padArea / padHeight, 1)
   metrics.push({
     section: 'Cooling',
-    label: 'Pad area',
+    label: 'Pad area (total)',
     value: padArea,
     unit: 'm²',
-    formula: `${fmt(tunnelAirflow)} / (${faceVel} × 3600) = ${fmt(padArea, 1)} m²`,
+    formula: `${fmt(tunnelAirflow)} / (${faceVel} × 3600) × ${fmt(padSides)} side(s) = ${fmt(padArea, 1)} m²`,
   })
   metrics.push({
     section: 'Cooling',
-    label: 'Pad length',
+    label: 'Pad length (total)',
     value: padLength,
     unit: 'm',
-    formula: `${fmt(padArea, 1)} / ${padHeight} = ${fmt(padLength, 1)} m`,
+    formula: `${fmt(padArea, 1)} / ${padHeight} = ${fmt(padLength, 1)} m  (${fmt(padSides)} side(s))`,
   })
   const pad = data.pads.find((p) => p.id === input.cooling_pad_model_id)
   if (pad) {

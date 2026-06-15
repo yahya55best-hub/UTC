@@ -1,7 +1,6 @@
 ﻿-- UTC CPQ — full_setup.sql
--- AUTO-CONCATENATED: migrations 0001-0006 + catalog seed, in dependency order.
--- Paste this whole file into the Supabase SQL Editor and Run, on a FRESH project.
--- (0006 equipment seed references brands, so it runs AFTER seed.sql.)
+-- AUTO-CONCATENATED: migrations 0001-0007 + catalog seed, in dependency order.
+-- Paste into the Supabase SQL Editor and Run on a FRESH project.
 
 
 -- ============================================================================
@@ -1120,6 +1119,7 @@ insert into public.calc_settings (key, value, unit, category, description) value
   -- Cooling pad (C.6)
   ('pad_face_velocity_ms',   1.30, 'm/s',     'cooling',  'Pad face velocity (preferred 1.25–1.40, MAX 1.5)'),
   ('pad_height_m',           1.5,  'm',       'cooling',  'Cooling pad height'),
+  ('cooling_pad_sides',      2,    'sides',   'cooling',  'Number of walls the pads run on (2 = both sides). Scales pad area/length/sheets/channel.'),
   ('channel_unit_len_m',     3.0,  'm',       'cooling',  'PVC cooling-pad channel unit length'),
   -- Side ventilation + inlets (C.7, C.8)
   ('bird_requirement_m3h_per_bird', 4.0, 'm3/h/bird', 'ventilation', 'Minimum ventilation per bird (DEFAULT — engineer to confirm by age/weight)'),
@@ -1197,5 +1197,55 @@ from (values
 ) as v(name, seclen, bpc, cps, tiers, area, brand_name, notes)
 left join public.brands b on b.name = v.brand_name
 on conflict (name) do nothing;
+
+
+-- ============================================================================
+-- >>> 0007_signup_approval.sql
+-- ============================================================================
+-- ============================================================================
+-- UTC CPQ — 0007 signup approval
+-- New self-signups are created INACTIVE (active = false) and must be approved
+-- by an OWNER/ADMIN before they can use the app. Safe to paste into the SQL
+-- editor on the existing project (replaces the handle_new_user function).
+-- ============================================================================
+
+create or replace function public.handle_new_user()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_domain   text;
+  v_allowed  jsonb;
+begin
+  v_domain := lower(split_part(new.email, '@', 2));
+
+  select value into v_allowed
+  from public.app_config
+  where key = 'allowed_email_domains';
+
+  if v_allowed is not null
+     and jsonb_typeof(v_allowed) = 'array'
+     and jsonb_array_length(v_allowed) > 0
+     and not (v_allowed ? v_domain)
+  then
+    raise exception 'Signups are restricted to approved company email domains (got: %).', v_domain
+      using errcode = 'check_violation';
+  end if;
+
+  insert into public.profiles (id, email, display_name, role, active)
+  values (
+    new.id,
+    new.email,
+    coalesce(new.raw_user_meta_data ->> 'display_name', split_part(new.email, '@', 1)),
+    'SALES',
+    false                       -- pending: an OWNER/ADMIN must approve (activate)
+  )
+  on conflict (id) do nothing;
+
+  return new;
+end;
+$$;
 
 
