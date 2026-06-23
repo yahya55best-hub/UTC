@@ -6,6 +6,7 @@ import {
 } from 'docx'
 import { money, formatDate } from './format'
 import { asset } from './asset'
+import { PRODUCT_INFO, itemKeyForLine } from './productInfo'
 import en from '../i18n/en.json'
 import ar from '../i18n/ar.json'
 import type { Currency, Customer, Quote, QuoteLine } from './types'
@@ -22,6 +23,21 @@ export interface QuoteExportArgs {
 
 const labels = (lang: DocLang) => (lang === 'ar' ? ar : en) as unknown as typeof en
 const safeName = (s: string) => s.replace(/[^\w\d-]+/g, '_').slice(0, 40)
+const EXCLUDED_NOTE: Bilingual = {
+  en: 'Electrical cables and lighting systems are excluded from this quote scope — to be determined separately.',
+  ar: 'الكابلات الكهربائية وأنظمة الإضاءة غير مشمولة في نطاق هذا العرض — تُحدَّد بشكل منفصل.',
+}
+interface Bilingual { en: string; ar: string }
+
+/** Custom unit label + bilingual description for a line, if it maps to a product. */
+function lineInfo(
+  l: { description_snapshot: string; brand_snapshot: string | null; calc_meta?: Record<string, unknown> | null },
+  lang: DocLang,
+): { unit: string; desc: string } | null {
+  const key = itemKeyForLine(l)
+  const info = key ? PRODUCT_INFO[key] : null
+  return info ? { unit: info.unit[lang], desc: info.desc[lang] } : null
+}
 const unitLabel = (L: typeof en, u: string | null) =>
   u ? (L.enums.unit as Record<string, string>)[u] ?? '' : ''
 const houseLabel = (L: typeof en, h: string | null) =>
@@ -67,16 +83,19 @@ function buildContainer({ quote, customer, lines, currency, lang }: QuoteExportA
   const rows = lines
     .slice()
     .sort((a, b) => a.sort_order - b.sort_order)
-    .map(
-      (l) => `<tr>
-        <td style="padding:7px 8px;border-bottom:1px solid #eee;text-align:${sA}">${escapeHtml(l.is_installation ? L.quote.installation : l.brand_snapshot)}</td>
-        <td style="padding:7px 8px;border-bottom:1px solid #eee;text-align:${sA}">${escapeHtml(l.description_snapshot)}${l.notes ? `<div style="color:#888;font-size:11px">${escapeHtml(l.notes)}</div>` : ''}</td>
-        <td style="padding:7px 8px;border-bottom:1px solid #eee;text-align:${eA}">${l.is_installation ? '' : Number(l.quantity).toLocaleString()}</td>
-        <td style="padding:7px 8px;border-bottom:1px solid #eee;text-align:${sA}">${unitLabel(L, l.unit)}</td>
-        <td style="padding:7px 8px;border-bottom:1px solid #eee;text-align:${eA}">${money(l.unit_price, currency)}</td>
-        <td style="padding:7px 8px;border-bottom:1px solid #eee;text-align:${eA}">${money(l.line_total, currency)}</td>
-      </tr>`,
-    )
+    .map((l) => {
+      const info = lineInfo(l, lang)
+      const unitText = info?.unit ?? unitLabel(L, l.unit)
+      const descBlock = info ? `<div style="color:#666;font-size:10.5px;margin-top:2px">${escapeHtml(info.desc)}</div>` : ''
+      return `<tr>
+        <td style="padding:7px 8px;border-bottom:1px solid #eee;text-align:${sA};vertical-align:top">${escapeHtml(l.is_installation ? L.quote.installation : l.brand_snapshot)}</td>
+        <td style="padding:7px 8px;border-bottom:1px solid #eee;text-align:${sA};vertical-align:top"><div style="font-weight:600">${escapeHtml(l.description_snapshot)}</div>${descBlock}${l.notes ? `<div style="color:#999;font-size:10px;margin-top:2px">${escapeHtml(l.notes)}</div>` : ''}</td>
+        <td style="padding:7px 8px;border-bottom:1px solid #eee;text-align:${eA};vertical-align:top">${l.is_installation ? '' : Number(l.quantity).toLocaleString()}</td>
+        <td style="padding:7px 8px;border-bottom:1px solid #eee;text-align:${sA};vertical-align:top">${escapeHtml(unitText)}</td>
+        <td style="padding:7px 8px;border-bottom:1px solid #eee;text-align:${eA};vertical-align:top">${money(l.unit_price, currency)}</td>
+        <td style="padding:7px 8px;border-bottom:1px solid #eee;text-align:${eA};vertical-align:top">${money(l.line_total, currency)}</td>
+      </tr>`
+    })
     .join('')
 
   const meta = (label: string, value: string) =>
@@ -126,6 +145,7 @@ function buildContainer({ quote, customer, lines, currency, lang }: QuoteExportA
       </table>
     </div>
     ${quote.notes ? `<div style="margin-top:18px"><div style="color:#6B6B6B;font-weight:700;text-transform:uppercase;font-size:11px">${escapeHtml(L.pdf.terms)}</div><div style="font-size:12px;color:#333;white-space:pre-wrap">${escapeHtml(quote.notes)}</div></div>` : ''}
+    <div style="margin-top:12px;font-size:11px;color:#9a6a00;background:#fff8e6;border:1px solid #f0e0a8;border-radius:6px;padding:8px 10px">⚠ ${escapeHtml(EXCLUDED_NOTE[lang])}</div>
     <div style="margin-top:28px;border-top:1px solid #e6e6e6;padding-top:10px;display:flex;justify-content:space-between;color:#6B6B6B;font-size:11px;font-style:italic">
       <span>${escapeHtml(L.pdf.thankYou)}</span><span>United Trade Co. — Cairo, Egypt</span>
     </div>`
@@ -213,22 +233,33 @@ export async function downloadQuoteDocx({ quote, customer, lines, currency, lang
     ],
   })
 
+  // description cell with an optional smaller bilingual product description
+  const descCell = (l: QuoteLine) => {
+    const info = lineInfo(l, lang)
+    const paras = [
+      new Paragraph({ alignment: align, bidirectional: rtl, children: [new TextRun({ text: l.description_snapshot, bold: true, rightToLeft: rtl, size: 19 })] }),
+    ]
+    if (info) paras.push(new Paragraph({ alignment: align, bidirectional: rtl, children: [new TextRun({ text: info.desc, color: '666666', rightToLeft: rtl, size: 15 })] }))
+    if (l.notes) paras.push(new Paragraph({ alignment: align, bidirectional: rtl, children: [new TextRun({ text: l.notes, color: '999999', rightToLeft: rtl, size: 14 })] }))
+    return new TableCell({ margins: { top: 60, bottom: 60, left: 80, right: 80 }, children: paras })
+  }
+
   const dataRows = lines
     .slice()
     .sort((a, b) => a.sort_order - b.sort_order)
-    .map(
-      (l) =>
-        new TableRow({
-          children: [
-            cell(l.is_installation ? L.quote.installation : l.brand_snapshot),
-            cell(l.description_snapshot + (l.notes ? `\n${l.notes}` : '')),
-            cell(l.is_installation ? '' : Number(l.quantity).toLocaleString(), { alignment: endAlign }),
-            cell(unitLabel(L, l.unit)),
-            cell(money(l.unit_price, currency), { alignment: endAlign }),
-            cell(money(l.line_total, currency), { alignment: endAlign }),
-          ],
-        }),
-    )
+    .map((l) => {
+      const info = lineInfo(l, lang)
+      return new TableRow({
+        children: [
+          cell(l.is_installation ? L.quote.installation : l.brand_snapshot),
+          descCell(l),
+          cell(l.is_installation ? '' : Number(l.quantity).toLocaleString(), { alignment: endAlign }),
+          cell(info?.unit ?? unitLabel(L, l.unit)),
+          cell(money(l.unit_price, currency), { alignment: endAlign }),
+          cell(money(l.line_total, currency), { alignment: endAlign }),
+        ],
+      })
+    })
 
   const table = new Table({
     width: { size: 100, type: WidthType.PERCENTAGE },
@@ -277,6 +308,7 @@ export async function downloadQuoteDocx({ quote, customer, lines, currency, lang
       para([run(quote.notes, { color: '333333' })], { after: 160 }),
     )
   }
+  children.push(para([run(`⚠ ${EXCLUDED_NOTE[lang]}`, { color: '9A6A00' })], { after: 160 }))
   children.push(para([run(L.pdf.thankYou, { color: '6B6B6B' })], { alignment: AlignmentType.CENTER }))
 
   const doc = new Document({

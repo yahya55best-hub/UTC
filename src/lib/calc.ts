@@ -79,6 +79,8 @@ export interface Proposal {
   unit: UnitType
   quantity: number
   formula: string
+  /** Links to PRODUCT_INFO for the bilingual description + custom unit label. */
+  itemKey?: string
   warning?: string
 }
 
@@ -229,40 +231,53 @@ export function runEngine(input: CalcInputs, data: EngineData): CalcResult {
     })
   }
 
-  // ---- Feeding (Addendum C.3) ----------------------------------------------
+  // Effective line length = house length − front/back clearance (1.5 m each end).
+  const clearance = get('pipe_clearance_total_m', 3)
+  const effLen = Math.max(0, round(L - clearance, 2))
+
+  // ---- Feeding (ROXELL NEW MiniMax pan feeder) -----------------------------
   let feedLines = 0
   if (W >= 11 && W <= 13) feedLines = get('feed_lines_11_13', 3)
   else if (W > 13) feedLines = get('feed_lines_above_13', 4)
   else warnings.push(`Width ${fmt(W)} m < 11 m: no default feed-line rule — set feed lines manually.`)
-  const totalFeed = feedLines * L
   if (feedLines > 0) {
+    const feedPipe = get('feed_pipe_len_m', 3.05)
+    const feedPipesPerLine = ceil(effLen / feedPipe)
+    const feedTotalPipes = feedPipesPerLine * feedLines
+    const feedLineLen = round(feedPipesPerLine * feedPipe, 1)
     addProposal(
-      proposals, 'Feeding & drinking', 'Feeding line', input.feed_brand ?? 'UTC.stav',
-      'Feeding line', 'PER_METER', round(totalFeed, 1),
-      `${W >= 11 && W <= 13 ? '11–13 m' : '>13 m'} → ${feedLines} lines × ${fmt(L)} m = ${fmt(totalFeed, 1)} m`,
+      proposals, 'Feeding & drinking', 'Feeding line', input.feed_brand ?? 'Roxell',
+      'Feeding line (ROXELL NEW MiniMax)', 'PER_UNIT', feedLines,
+      `eff. ${fmt(effLen, 1)} m → ${feedPipesPerLine} pipes/line (≈${fmt(feedLineLen, 1)} m) → ${feedTotalPipes} pipes total`,
+      { itemKey: 'FEEDING' },
     )
+    metrics.push({ section: 'Feeding & drinking', label: 'Feed pipes per line', value: feedPipesPerLine, unit: 'pipes', formula: `ceil(${fmt(effLen, 1)} / ${feedPipe}) = ${feedPipesPerLine}` })
+    metrics.push({ section: 'Feeding & drinking', label: 'Feed pipes total', value: feedTotalPipes, unit: 'pipes', formula: `${feedPipesPerLine} × ${feedLines} lines = ${feedTotalPipes}` })
+    metrics.push({ section: 'Feeding & drinking', label: 'Feed line length', value: feedLineLen, unit: 'm', formula: `${feedPipesPerLine} × ${feedPipe} m` })
   }
 
-  // ---- Drinking (Addendum C.4) ---------------------------------------------
+  // ---- Drinking (ROXELL nipple) --------------------------------------------
   let waterLines = 0
   if (W >= 11 && W <= 13) waterLines = get('water_lines_11_13', 4)
   else if (W > 13) waterLines = get('water_lines_above_13', 5)
   else warnings.push(`Width ${fmt(W)} m < 11 m: no default water-line rule — set water lines manually.`)
-  const nipplesPerLine = get('nipples_per_line', 15)
-  const totalWater = waterLines * L
   if (waterLines > 0) {
+    const waterPipe = get('water_pipe_len_m', 3)
+    const nipplesPerPipe = get('nipples_per_pipe', 15)
+    const waterPipesPerLine = ceil(effLen / waterPipe)
+    const waterTotalPipes = waterPipesPerLine * waterLines
+    const totalNipples = waterTotalPipes * nipplesPerPipe
+    const waterLineLen = round(waterPipesPerLine * waterPipe, 1)
     addProposal(
-      proposals, 'Feeding & drinking', 'Drinking line', input.water_brand ?? 'UTC.stav',
-      'Drinking line', 'PER_METER', round(totalWater, 1),
-      `${W >= 11 && W <= 13 ? '11–13 m' : '>13 m'} → ${waterLines} lines × ${fmt(L)} m = ${fmt(totalWater, 1)} m`,
+      proposals, 'Feeding & drinking', 'Drinking line', input.water_brand ?? 'Roxell',
+      'Drinking line (ROXELL nipple)', 'PER_UNIT', waterLines,
+      `eff. ${fmt(effLen, 1)} m → ${waterPipesPerLine} pipes/line (≈${fmt(waterLineLen, 1)} m) → ${waterTotalPipes} pipes total`,
+      { itemKey: 'DRINKING' },
     )
-    metrics.push({
-      section: 'Feeding & drinking',
-      label: 'Total nipples',
-      value: waterLines * nipplesPerLine,
-      unit: 'nipples',
-      formula: `${waterLines} lines × ${nipplesPerLine} = ${fmt(waterLines * nipplesPerLine)}`,
-    })
+    metrics.push({ section: 'Feeding & drinking', label: 'Water pipes per line', value: waterPipesPerLine, unit: 'pipes', formula: `ceil(${fmt(effLen, 1)} / ${waterPipe}) = ${waterPipesPerLine}` })
+    metrics.push({ section: 'Feeding & drinking', label: 'Water pipes total', value: waterTotalPipes, unit: 'pipes', formula: `${waterPipesPerLine} × ${waterLines} lines = ${waterTotalPipes}` })
+    metrics.push({ section: 'Feeding & drinking', label: 'Total nipples', value: totalNipples, unit: 'nipples', formula: `${waterTotalPipes} pipes × ${nipplesPerPipe} (≈20 cm spacing) = ${fmt(totalNipples)}` })
+    metrics.push({ section: 'Feeding & drinking', label: 'Water line length', value: waterLineLen, unit: 'm', formula: `${waterPipesPerLine} × ${waterPipe} m` })
   }
 
   // ---- Tunnel ventilation (Addendum C.5) -----------------------------------
@@ -287,6 +302,7 @@ export function runEngine(input: CalcInputs, data: EngineData): CalcResult {
         proposals, 'Ventilation', 'Tunnel fans', brandName(data, tunnelFan.brand_id),
         `${tunnelFan.name} — tunnel fan`, 'PER_UNIT', count,
         `ceil(${fmt(tunnelAirflow)} / ${fmt(tunnelFan.capacity_m3h)}) = ${count}`,
+        { itemKey: 'TUNNEL_FAN' },
       )
     }
   }
@@ -319,17 +335,18 @@ export function runEngine(input: CalcInputs, data: EngineData): CalcResult {
   if (pad) {
     const sheets = ceil(padArea / pad.sheet_face_area_m2)
     addProposal(
-      proposals, 'Cooling', 'Cooling pad sheets', brandName(data, pad.brand_id),
+      proposals, 'Cooling', 'Cooling pads', brandName(data, pad.brand_id),
       `${pad.name}`, 'PER_UNIT', sheets,
       `ceil(${fmt(padArea, 1)} / ${pad.sheet_face_area_m2}) = ${sheets}`,
+      { itemKey: 'COOLING_PAD' },
     )
   }
-  const channelLen = get('channel_unit_len_m', 3)
-  const channels = ceil(padLength / channelLen)
+  // Cooling-pad channel quoted by total metres (PVC), runs alongside the pads.
   addProposal(
-    proposals, 'Cooling', 'Cooling-pad channel (PVC, 3 m)', 'UTC.stav',
-    'Cooling-pad PVC channel', 'PER_UNIT', channels,
-    `ceil(${fmt(padLength, 1)} / ${channelLen}) = ${channels}`,
+    proposals, 'Cooling', 'Cooling-pad channel (PVC)', 'UTC.stav',
+    'Cooling-pad PVC channel', 'PER_METER', padLength,
+    `pad length = ${fmt(padLength, 1)} m`,
+    { itemKey: 'COOLING_CHANNEL' },
   )
 
   // ---- Side ventilation (Addendum C.7) -------------------------------------
@@ -354,6 +371,7 @@ export function runEngine(input: CalcInputs, data: EngineData): CalcResult {
           proposals, 'Ventilation', 'Side fans', brandName(data, sideFan.brand_id),
           `${sideFan.name} — side fan`, 'PER_UNIT', count,
           `ceil(${fmt(requiredSide)} / ${fmt(sideFan.capacity_m3h)}) = ${count}`,
+          { itemKey: 'SIDE_FAN' },
         )
       }
     }
@@ -370,9 +388,10 @@ export function runEngine(input: CalcInputs, data: EngineData): CalcResult {
       const perSide = ceil(requiredSide / inlet.airflow_per_inlet_m3h)
       const total = perSide * 2
       addProposal(
-        proposals, 'Ventilation', 'Side air inlets (both sides)', brandName(data, inlet.brand_id),
+        proposals, 'Ventilation', 'Air inlet windows (both sides)', brandName(data, inlet.brand_id),
         `${inlet.name} — air inlet`, 'PER_UNIT', total,
         `ceil(${fmt(requiredSide)} / ${fmt(inlet.airflow_per_inlet_m3h)}) × 2 = ${total}`,
+        { itemKey: 'AIR_INLET' },
       )
     }
   }
@@ -382,9 +401,10 @@ export function runEngine(input: CalcInputs, data: EngineData): CalcResult {
   const recircCount = ceil(L / recircSpacing)
   const recircFan = data.fans.find((f) => f.id === input.recirc_fan_model_id)
   addProposal(
-    proposals, 'Ventilation', 'Recirculation fans', recircFan ? brandName(data, recircFan.brand_id) : 'Pericoli',
-    recircFan ? `${recircFan.name} — recirc fan` : 'Recirculation fan', 'PER_UNIT', recircCount,
+    proposals, 'Ventilation', 'Circulation fans', recircFan ? brandName(data, recircFan.brand_id) : 'Pericoli',
+    recircFan ? `${recircFan.name} — circulation fan` : 'Circulation fan (ACF 21 P)', 'PER_UNIT', recircCount,
     `ceil(${fmt(L)} / ${recircSpacing}) = ${recircCount}`,
+    { itemKey: 'CIRC_FAN' },
   )
 
   // ---- Heating (Addendum C.10) ---------------------------------------------
@@ -392,9 +412,10 @@ export function runEngine(input: CalcInputs, data: EngineData): CalcResult {
   const coverage = heater?.coverage_m ?? get('heater_coverage_m', 27.5)
   const heaterCount = ceil(L / coverage)
   addProposal(
-    proposals, 'Heating', 'Heaters', heater ? brandName(data, heater.brand_id) : 'Pericoli',
-    heater ? `${heater.name} — heater` : 'Heater', 'PER_UNIT', heaterCount,
+    proposals, 'Heating', 'Heaters', heater ? brandName(data, heater.brand_id) : 'UTC.stav',
+    heater ? `${heater.name}` : 'UTC heater', 'PER_UNIT', heaterCount,
     `ceil(${fmt(L)} / ${coverage}) = ${heaterCount}`,
+    { itemKey: 'HEATER' },
   )
 
   // ---- Lighting estimate (Addendum B.7 — HATO plan is authoritative) -------
@@ -405,7 +426,7 @@ export function runEngine(input: CalcInputs, data: EngineData): CalcResult {
     proposals, 'Lighting', 'LED lamps (ESTIMATE — confirm with HATO)', 'Hato',
     'LED lamp (estimate)', 'PER_UNIT', lampEstimate,
     `ceil((${fmt(L)} / ${lampSpacing}) × ${lampRows}) = ${lampEstimate}`,
-    'Estimate only — enter the HATO light-plan output as the authoritative figure.',
+    { warning: 'Estimate only — enter the HATO light-plan output as the authoritative figure.' },
   )
 
   return { birds, metrics, proposals, warnings }
@@ -425,7 +446,7 @@ function addProposal(
   unit: UnitType,
   quantity: number,
   formula: string,
-  warning?: string,
+  opts: { itemKey?: string; warning?: string } = {},
 ) {
   arr.push({
     key: `${section}:${label}`.replace(/\s+/g, '_'),
@@ -436,6 +457,7 @@ function addProposal(
     unit,
     quantity,
     formula,
-    warning,
+    itemKey: opts.itemKey,
+    warning: opts.warning,
   })
 }

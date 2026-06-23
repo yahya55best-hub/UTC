@@ -6,6 +6,7 @@ import {
   type CalcInputs, type CalcResult, type Proposal, type EngineData,
 } from '../lib/calc'
 import { generateBoqPdf } from '../lib/boqPdf'
+import { PRODUCT_INFO } from '../lib/productInfo'
 import { Field, Spinner } from './ui'
 import type { Brand, Customer, LightingPlan, Quote } from '../lib/types'
 
@@ -344,7 +345,7 @@ function FragmentSection({
             <input className="input w-24 px-2 py-1 text-end tabular" type="number" step="any" value={p.quantity}
               onChange={(e) => onQty(p.key, Number(e.target.value))} />
           </td>
-          <td className="td text-xs">{p.unit.replace('PER_', '').toLowerCase()}</td>
+          <td className="td text-xs">{(p.itemKey && PRODUCT_INFO[p.itemKey]?.unit.en) || p.unit.replace('PER_', '').toLowerCase()}</td>
           <td className="td text-xs text-ink-muted">{p.formula}</td>
         </tr>
       ))}
