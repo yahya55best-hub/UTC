@@ -91,6 +91,19 @@ export function HouseSizingPanel({
     onSnapshot({ inputs: inp, result: r, lighting })
   }
 
+  // Reactive: recompute automatically whenever ANY given (dimensions, models,
+  // settings) changes — required by the PRD. Editing a result quantity only
+  // changes `edited` (not `inp`), so manual edits are not wiped mid-edit.
+  useEffect(() => {
+    if (eng.loading) return
+    const r = runEngine(inp, engineData)
+    setResult(r)
+    setEdited(r.proposals.map((p) => ({ ...p })))
+    setSelected(Object.fromEntries(r.proposals.map((p) => [p.key, true])))
+    onSnapshot({ inputs: inp, result: r, lighting })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inp, engineData, eng.loading])
+
   function addToQuote() {
     const chosen = edited.filter((p) => selected[p.key] && p.quantity > 0)
     // Apply HATO lighting count if provided as authoritative.
@@ -238,7 +251,10 @@ export function HouseSizingPanel({
         </Field>
       </div>
 
-      <button className="btn-primary mt-4" onClick={compute}>⚙ {t('calc.calculate')}</button>
+      <div className="mt-4 flex flex-wrap items-center gap-3">
+        <button className="btn-outline" onClick={compute}>↻ {t('calc.calculate')}</button>
+        <span className="text-xs text-ink-muted">{t('calc.autoHint')}</span>
+      </div>
 
       {/* Results */}
       {result && (
