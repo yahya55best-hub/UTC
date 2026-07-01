@@ -62,7 +62,7 @@ export const PRODUCT_INFO: Record<string, ProductInfo> = {
     },
   },
   TUNNEL_INLET: {
-    unit: { en: 'set', ar: 'نظام' },
+    unit: { en: 'meter', ar: 'متر' },
     desc: {
       en: 'Tunnel ventilation inlet system, installed on the air inlet openings of the cooling pad section. Each side: 27 m length × 1 m height. Opening/closing angle is motor-controlled.',
       ar: 'نظام أنفاق التهوية لخلايا التبريد Tunnel inlet — يثبت النظام على فتحات دخول الهواء من الخلايا. طول الجانب 27 م وارتفاع 1 م × 2 جنب. يتم التحكم في النظام عن طريق موتور للتحكم في زاوية فتح وغلق الأنفاق.',

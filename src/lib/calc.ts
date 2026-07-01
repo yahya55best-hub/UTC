@@ -293,61 +293,74 @@ export function runEngine(input: CalcInputs, data: EngineData): CalcResult {
     formula: `(${fmt(W)} × ${fmt(openH)}) m² × ${speed} m/s × 3600 = ${fmt(tunnelAirflow)} m³/h`,
   })
   const tunnelFan = data.fans.find((f) => f.id === input.tunnel_fan_model_id)
+  let tunnelFanCount: number | null = null
   if (tunnelFan) {
     if (tunnelFan.capacity_m3h == null) {
       warnings.push(`Tunnel fan "${tunnelFan.name}" has no capacity (m³/h) set — set it before sizing.`)
     } else {
-      const count = ceil(tunnelAirflow / tunnelFan.capacity_m3h)
+      tunnelFanCount = ceil(tunnelAirflow / tunnelFan.capacity_m3h)
       addProposal(
         proposals, 'Ventilation', 'Tunnel fans', brandName(data, tunnelFan.brand_id),
-        `${tunnelFan.name} — tunnel fan`, 'PER_UNIT', count,
-        `ceil(${fmt(tunnelAirflow)} / ${fmt(tunnelFan.capacity_m3h)}) = ${count}`,
+        `${tunnelFan.name} — tunnel fan`, 'PER_UNIT', tunnelFanCount,
+        `ceil(${fmt(tunnelAirflow)} / ${fmt(tunnelFan.capacity_m3h)}) = ${tunnelFanCount}`,
         { itemKey: 'TUNNEL_FAN' },
       )
     }
   }
 
-  // ---- Cooling pads (Addendum C.6 / D.5) -----------------------------------
-  // Pads run on both side walls by default (cooling_pad_sides = 2). The
-  // airflow-derived area is the per-side requirement; total scales by sides.
-  const padSides = get('cooling_pad_sides', 2)
-  const faceVel = get('pad_face_velocity_ms', 1.3)
-  if (faceVel > 1.5) warnings.push(`Pad face velocity ${faceVel} m/s exceeds the 1.5 m/s maximum.`)
-  const padHeight = get('pad_height_m', 1.5)
-  const padAreaPerSide = tunnelAirflow / (faceVel * 3600)
-  const padArea = round(padAreaPerSide * padSides, 1)
-  const padLength = round(padArea / padHeight, 1)
-  metrics.push({
-    section: 'Cooling',
-    label: 'Pad area (total)',
-    value: padArea,
-    unit: 'm²',
-    formula: `${fmt(tunnelAirflow)} / (${faceVel} × 3600) × ${fmt(padSides)} side(s) = ${fmt(padArea, 1)} m²`,
-  })
-  metrics.push({
-    section: 'Cooling',
-    label: 'Pad length (total)',
-    value: padLength,
-    unit: 'm',
-    formula: `${fmt(padArea, 1)} / ${padHeight} = ${fmt(padLength, 1)} m  (${fmt(padSides)} side(s))`,
-  })
+  // ---- Cooling pads (fan-count rule — replaces airflow derivation) ---------
+  // Pad area = tunnelFans × pad_area_per_fan_m2 (fixed 6, does NOT scale with
+  // fan airflow). Total pads snap so padsPerSide × padW is a whole multiple of
+  // 3 m (channels/inlets come in 3 m units).
   const pad = data.pads.find((p) => p.id === input.cooling_pad_model_id)
-  if (pad) {
-    const sheets = ceil(padArea / pad.sheet_face_area_m2)
+  const padSides = get('cooling_pad_sides', 2)
+  const padH = get('pad_height_m', 1.5)
+  const padW = pad?.sheet_w_m ?? 0.6
+  const padFaceArea = round(padW * padH, 4)
+  const padAreaPerFan = get('pad_area_per_fan_m2', 6)
+  if (tunnelFanCount == null) {
+    warnings.push('Select a tunnel fan model (with capacity) to size the cooling pads — pad area = tunnel fans × ' + padAreaPerFan + '.')
+  } else if (padFaceArea <= 0) {
+    warnings.push('Cooling pad has no valid width/height for pad sizing.')
+  } else {
+    const padAreaReq = round(tunnelFanCount * padAreaPerFan, 2)
+    const rawPads = padAreaReq / padFaceArea
+    // smallest per-side pad count whose run length (× padW) is a multiple of 3 m
+    let stepPerSide = 1
+    for (let s = 1; s <= 1000; s++) {
+      const r = (s * padW) / 3
+      if (Math.abs(r - Math.round(r)) < 1e-6) { stepPerSide = s; break }
+    }
+    const rawPerSide = rawPads / padSides
+    const padsPerSide = Math.max(stepPerSide, Math.round(rawPerSide / stepPerSide) * stepPerSide)
+    const totalPads = padsPerSide * padSides
+    const runPerSide = round(padsPerSide * padW, 2)
+    const channelTotal = round(runPerSide * padSides, 2)
+
+    metrics.push({ section: 'Cooling', label: 'Pad area required', value: padAreaReq, unit: 'm²', formula: `${tunnelFanCount} fans × ${padAreaPerFan} = ${fmt(padAreaReq, 1)} m²` })
+    metrics.push({ section: 'Cooling', label: 'Raw pads', value: round(rawPads, 2), unit: 'pads', formula: `${fmt(padAreaReq, 1)} / (${padW}×${padH}=${padFaceArea}) = ${fmt(rawPads, 2)}` })
+    metrics.push({ section: 'Cooling', label: 'Pads per side', value: padsPerSide, unit: 'pads', formula: `round(${fmt(rawPerSide, 2)} / ${stepPerSide}) × ${stepPerSide} = ${padsPerSide}` })
+    metrics.push({ section: 'Cooling', label: 'Pad run per side', value: runPerSide, unit: 'm', formula: `${padsPerSide} × ${padW} m = ${fmt(runPerSide, 1)} m` })
+
     addProposal(
-      proposals, 'Cooling', 'Cooling pads', brandName(data, pad.brand_id),
-      `${pad.name}`, 'PER_UNIT', sheets,
-      `ceil(${fmt(padArea, 1)} / ${pad.sheet_face_area_m2}) = ${sheets}`,
+      proposals, 'Cooling', 'Cooling pads', pad ? brandName(data, pad.brand_id) : 'Smart Falcon',
+      pad ? `${pad.name}` : 'Cooling pad', 'PER_UNIT', totalPads,
+      `raw ${fmt(rawPads, 2)} → ${padsPerSide}/side × ${padSides} = ${totalPads} pads`,
       { itemKey: 'COOLING_PAD' },
     )
+    addProposal(
+      proposals, 'Cooling', 'Cooling-pad channel (PVC)', 'UTC.stav',
+      'Cooling-pad PVC channel', 'PER_METER', channelTotal,
+      `${padsPerSide} pads/side × ${padW} m × ${padSides} sides = ${fmt(channelTotal, 1)} m`,
+      { itemKey: 'COOLING_CHANNEL' },
+    )
+    addProposal(
+      proposals, 'Cooling', 'Tunnel inlet (pad section)', 'UTC.stav',
+      'Tunnel inlet system', 'PER_METER', channelTotal,
+      `${fmt(runPerSide, 1)} m/side × ${padSides} sides = ${fmt(channelTotal, 1)} m`,
+      { itemKey: 'TUNNEL_INLET' },
+    )
   }
-  // Cooling-pad channel quoted by total metres (PVC), runs alongside the pads.
-  addProposal(
-    proposals, 'Cooling', 'Cooling-pad channel (PVC)', 'UTC.stav',
-    'Cooling-pad PVC channel', 'PER_METER', padLength,
-    `pad length = ${fmt(padLength, 1)} m`,
-    { itemKey: 'COOLING_CHANNEL' },
-  )
 
   // ---- Side ventilation (Addendum C.7) -------------------------------------
   const birdReq = get('bird_requirement_m3h_per_bird', 4)
