@@ -96,6 +96,13 @@ export const PRODUCT_INFO: Record<string, ProductInfo> = {
       ar: 'نظام السايلو ROXELL — مصنع من ألواح مموجة مجلفنة (نظام الجلفنة الثقيلة) لتقليل تقلبات درجات الحرارة داخل السايلو، بالإضافة إلى طبقة واقية ملساء من الداخل. نظام الفليكس أوجر ROXELL: مكون من أنابيب Novicor قطر 90 مم المقاومة للأشعة فوق البنفسجية ودرجة الحرارة والتآكل (مدة تشغيل ساعتين في اليوم)، حيث يضمن الأوجر النقل الآمن لأنواع العلف المختلفة (ناعم – محبب) بالإضافة للمحافظة على مستويات الأمن الحيوي. الأوجر بطول 18 متر طولي لنقل العلف من السايلو إلى داخل العنبر لتزويد الخطوط بالعلف.',
     },
   },
+  LED_LINE: {
+    unit: { en: 'lines', ar: 'خطوط' },
+    desc: {
+      en: 'HATO LED lighting line (fixtures + controller). Line count matches the feeding lines; final fixture layout/quantity per the HATO light plan.',
+      ar: 'خط إضاءة LED من HATO (وحدات الإضاءة + وحدة التحكم). عدد الخطوط مطابق لخطوط التغذية؛ التوزيع النهائي وعدد الوحدات حسب خطة إضاءة HATO.',
+    },
+  },
   EXTERNAL_LOADER: {
     unit: { en: 'loader', ar: 'ملو' },
     desc: {

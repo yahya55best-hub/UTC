@@ -200,6 +200,7 @@ insert into public.calc_settings (key, value, unit, category, description) value
   ('bird_requirement_m3h_per_bird', 4.0, 'm3/h/bird', 'ventilation', 'Minimum ventilation per bird (DEFAULT — engineer to confirm by age/weight)'),
   -- Recirculation + heating (C.9, C.10)
   ('recirc_fan_spacing_m',   30,   'm',       'ventilation', 'Spacing between recirculation fans'),
+  ('air_inlet_spacing_m',    3,    'm',       'ventilation', 'House length per air inlet window (floor(L/spacing) = total for the house).'),
   ('heater_coverage_m',      27.5, 'm',       'heating',  'House length covered per heater (range 25–30)'),
   -- Stocking / bird density (C.13, E.1)
   ('stocking_density_kgm2',  40,   'kg/m2',   'capacity', 'Default stocking density (weight method; editable per quote)'),

@@ -237,12 +237,13 @@ export function runEngine(input: CalcInputs, data: EngineData): CalcResult {
 
   // ---- Feeding (ROXELL NEW MiniMax pan feeder) -----------------------------
   let feedLines = 0
+  let feedPipesPerLine = 0
   if (W >= 11 && W <= 13) feedLines = get('feed_lines_11_13', 3)
   else if (W > 13) feedLines = get('feed_lines_above_13', 4)
   else warnings.push(`Width ${fmt(W)} m < 11 m: no default feed-line rule — set feed lines manually.`)
   if (feedLines > 0) {
     const feedPipe = get('feed_pipe_len_m', 3.05)
-    const feedPipesPerLine = ceil(effLen / feedPipe)
+    feedPipesPerLine = ceil(effLen / feedPipe)
     const feedTotalPipes = feedPipesPerLine * feedLines
     const feedLineLen = round(feedPipesPerLine * feedPipe, 1)
     addProposal(
@@ -264,17 +265,18 @@ export function runEngine(input: CalcInputs, data: EngineData): CalcResult {
   if (waterLines > 0) {
     const waterPipe = get('water_pipe_len_m', 3)
     const nipplesPerPipe = get('nipples_per_pipe', 15)
-    const waterPipesPerLine = ceil(effLen / waterPipe)
+    // Drinking pipes per line = feeding pipes per line + 1 (always exactly one more).
+    const waterPipesPerLine = (feedPipesPerLine > 0 ? feedPipesPerLine : ceil(effLen / waterPipe)) + 1
     const waterTotalPipes = waterPipesPerLine * waterLines
     const totalNipples = waterTotalPipes * nipplesPerPipe
     const waterLineLen = round(waterPipesPerLine * waterPipe, 1)
     addProposal(
       proposals, 'Feeding & drinking', 'Drinking line', input.water_brand ?? 'Roxell',
       'Drinking line (ROXELL nipple)', 'PER_UNIT', waterLines,
-      `eff. ${fmt(effLen, 1)} m → ${waterPipesPerLine} pipes/line (≈${fmt(waterLineLen, 1)} m) → ${waterTotalPipes} pipes total`,
+      `${waterPipesPerLine} pipes/line (feed ${feedPipesPerLine} + 1) → ${waterTotalPipes} pipes total (≈${fmt(waterLineLen, 1)} m)`,
       { itemKey: 'DRINKING' },
     )
-    metrics.push({ section: 'Feeding & drinking', label: 'Water pipes per line', value: waterPipesPerLine, unit: 'pipes', formula: `ceil(${fmt(effLen, 1)} / ${waterPipe}) = ${waterPipesPerLine}` })
+    metrics.push({ section: 'Feeding & drinking', label: 'Water pipes per line', value: waterPipesPerLine, unit: 'pipes', formula: `feeding ${feedPipesPerLine} + 1 = ${waterPipesPerLine}` })
     metrics.push({ section: 'Feeding & drinking', label: 'Water pipes total', value: waterTotalPipes, unit: 'pipes', formula: `${waterPipesPerLine} × ${waterLines} lines = ${waterTotalPipes}` })
     metrics.push({ section: 'Feeding & drinking', label: 'Total nipples', value: totalNipples, unit: 'nipples', formula: `${waterTotalPipes} pipes × ${nipplesPerPipe} (≈20 cm spacing) = ${fmt(totalNipples)}` })
     metrics.push({ section: 'Feeding & drinking', label: 'Water line length', value: waterLineLen, unit: 'm', formula: `${waterPipesPerLine} × ${waterPipe} m` })
@@ -392,22 +394,18 @@ export function runEngine(input: CalcInputs, data: EngineData): CalcResult {
     warnings.push('Bird count is needed for side-ventilation sizing.')
   }
 
-  // ---- Air inlets (Addendum C.8 — always both sides) -----------------------
+  // ---- Air inlets — one per 3 m of house length (TOTAL for the house) ------
+  // NOTE (wall basis): airInlets is the TOTAL count for the whole house, not
+  // per-wall. floor(L/spacing); to switch to per-wall × 2, multiply by 2.
   const inlet = data.inlets.find((m) => m.id === input.air_inlet_model_id)
-  if (inlet && requiredSide != null) {
-    if (inlet.airflow_per_inlet_m3h == null) {
-      warnings.push(`Air inlet "${inlet.name}" has no airflow figure set.`)
-    } else {
-      const perSide = ceil(requiredSide / inlet.airflow_per_inlet_m3h)
-      const total = perSide * 2
-      addProposal(
-        proposals, 'Ventilation', 'Air inlet windows (both sides)', brandName(data, inlet.brand_id),
-        `${inlet.name} — air inlet`, 'PER_UNIT', total,
-        `ceil(${fmt(requiredSide)} / ${fmt(inlet.airflow_per_inlet_m3h)}) × 2 = ${total}`,
-        { itemKey: 'AIR_INLET' },
-      )
-    }
-  }
+  const inletSpacing = get('air_inlet_spacing_m', 3)
+  const airInlets = floor(L / inletSpacing)
+  addProposal(
+    proposals, 'Ventilation', 'Air inlet windows', inlet ? brandName(data, inlet.brand_id) : 'UTC.stav',
+    inlet ? `${inlet.name} — air inlet` : 'Air inlet window', 'PER_UNIT', airInlets,
+    `floor(${fmt(L)} / ${inletSpacing}) = ${airInlets} (total for house)`,
+    { itemKey: 'AIR_INLET' },
+  )
 
   // ---- Recirculation fans (Addendum C.9) -----------------------------------
   const recircSpacing = get('recirc_fan_spacing_m', 30)
@@ -431,7 +429,17 @@ export function runEngine(input: CalcInputs, data: EngineData): CalcResult {
     { itemKey: 'HEATER' },
   )
 
-  // ---- Lighting estimate (Addendum B.7 — HATO plan is authoritative) -------
+  // ---- Lighting lines = feeding lines (reactive) ---------------------------
+  if (feedLines > 0) {
+    addProposal(
+      proposals, 'Lighting', 'LED lighting lines', 'Hato',
+      'LED lighting line', 'PER_UNIT', feedLines,
+      `= feeding lines = ${feedLines}`,
+      { itemKey: 'LED_LINE' },
+    )
+  }
+
+  // ---- Lighting lamp estimate (Addendum B.7 — HATO plan is authoritative) --
   const lampSpacing = get('lamp_spacing_m', 3)
   const lampRows = input.lamp_rows ?? 3
   const lampEstimate = ceil((L / lampSpacing) * lampRows)
