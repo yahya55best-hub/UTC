@@ -210,6 +210,9 @@ export interface AirInletModel {
   id: string
   name: string
   size_label: string | null
+  width_m: number | null
+  height_m: number | null
+  /** Informational only — NOT used by the inlet-count calculation. */
   airflow_per_inlet_m3h: number | null
   brand_id: string | null
   active: boolean

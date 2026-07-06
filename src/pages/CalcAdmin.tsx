@@ -160,7 +160,11 @@ export function CalcAdminPage() {
       <EquipTable
         title="Air inlet models"
         rows={eng.inlets}
-        cols={[{ label: 'airflow/inlet m³/h', field: 'airflow_per_inlet_m3h', table: 'air_inlet_models' }]}
+        cols={[
+          { label: 'width m', field: 'width_m', table: 'air_inlet_models' },
+          { label: 'height m', field: 'height_m', table: 'air_inlet_models' },
+          { label: 'airflow m³/h (info)', field: 'airflow_per_inlet_m3h', table: 'air_inlet_models' },
+        ]}
         onCommit={updateRow}
         onDelete={(id) => del('air_inlet_models', id)}
       />

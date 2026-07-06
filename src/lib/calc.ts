@@ -394,18 +394,49 @@ export function runEngine(input: CalcInputs, data: EngineData): CalcResult {
     warnings.push('Bird count is needed for side-ventilation sizing.')
   }
 
-  // ---- Air inlets — one per 3 m of house length (TOTAL for the house) ------
-  // NOTE (wall basis): airInlets is the TOTAL count for the whole house, not
-  // per-wall. floor(L/spacing); to switch to per-wall × 2, multiply by 2.
+  // ---- Air inlets — airflow/area-driven (3 m spacing = placement + max) -----
+  // Count = required inlet area / area-per-inlet, rounded up to an even total
+  // (equal split across 2 side walls). Reads structured width_m × height_m from
+  // the selected model — never parses dimensions from text. Reactive to inlet
+  // model, side fan model/capacity, and the three inlet settings.
   const inlet = data.inlets.find((m) => m.id === input.air_inlet_model_id)
+  const sideFanInlet = data.fans.find((f) => f.id === input.side_fan_model_id)
+  const inletVel = get('inlet_air_velocity_ms', 3)
+  const sizingFans = get('inlet_sizing_side_fans', 3)
   const inletSpacing = get('air_inlet_spacing_m', 3)
-  const airInlets = floor(L / inletSpacing)
-  addProposal(
-    proposals, 'Ventilation', 'Air inlet windows', inlet ? brandName(data, inlet.brand_id) : 'UTC.stav',
-    inlet ? `${inlet.name} — air inlet` : 'Air inlet window', 'PER_UNIT', airInlets,
-    `floor(${fmt(L)} / ${inletSpacing}) = ${airInlets} (total for house)`,
-    { itemKey: 'AIR_INLET' },
-  )
+  if (!inlet) {
+    warnings.push('Select an air inlet model to size air inlets.')
+  } else if (inlet.width_m == null || inlet.height_m == null) {
+    warnings.push(`Air inlet "${inlet.name}" has no width/height set — cannot size inlets (enter width_m × height_m).`)
+  } else if (sideFanInlet?.capacity_m3h == null) {
+    warnings.push('Select a side fan model (with capacity) to size air inlets.')
+  } else {
+    const sideCap = sideFanInlet.capacity_m3h
+    const designAirflow = sizingFans * sideCap
+    const areaReq = designAirflow / (3600 * inletVel)
+    const areaPerInlet = inlet.width_m * inlet.height_m
+    const rawInlets = ceil(areaReq / areaPerInlet)
+    const totalInlets = rawInlets % 2 === 0 ? rawInlets : rawInlets + 1
+    const inletsPerSide = totalInlets / 2
+    const maxPerSide = floor(L / inletSpacing)
+
+    metrics.push({ section: 'Ventilation', label: 'Inlet design airflow', value: designAirflow, unit: 'm³/h', formula: `${sizingFans} side fans × ${fmt(sideCap)} = ${fmt(designAirflow)} m³/h` })
+    metrics.push({ section: 'Ventilation', label: 'Inlet area required', value: round(areaReq, 3), unit: 'm²', formula: `${fmt(designAirflow)} / (3600 × ${inletVel}) = ${fmt(areaReq, 2)} m²` })
+    metrics.push({ section: 'Ventilation', label: 'Area per inlet', value: round(areaPerInlet, 4), unit: 'm²', formula: `${inlet.width_m} × ${inlet.height_m} = ${fmt(areaPerInlet, 4)} m²` })
+    metrics.push({ section: 'Ventilation', label: 'Raw inlets', value: rawInlets, unit: 'inlets', formula: `ceil(${fmt(areaReq, 2)} / ${fmt(areaPerInlet, 4)}) = ${rawInlets}` })
+    metrics.push({ section: 'Ventilation', label: 'Inlets per side', value: inletsPerSide, unit: 'inlets', formula: `${totalInlets} / 2 sides = ${inletsPerSide}` })
+    metrics.push({ section: 'Ventilation', label: 'Spacing ceiling per side', value: maxPerSide, unit: 'inlets', formula: `floor(${fmt(L)} / ${inletSpacing}) = ${maxPerSide}${inletsPerSide > maxPerSide ? ' — EXCEEDED' : ' — ok'}` })
+
+    addProposal(
+      proposals, 'Ventilation', 'Air inlet windows', brandName(data, inlet.brand_id),
+      `${inlet.name} — air inlet`, 'PER_UNIT', totalInlets,
+      `${sizingFans}×${fmt(sideCap)} / (3600×${inletVel}) = ${fmt(areaReq, 2)} m² ÷ ${fmt(areaPerInlet, 4)} = ${rawInlets} → even ${totalInlets} (${inletsPerSide}/side)`,
+      { itemKey: 'AIR_INLET' },
+    )
+    if (inletsPerSide > maxPerSide) {
+      warnings.push(`Air inlets: ${inletsPerSide}/side exceeds the ${maxPerSide}/side capacity at ${inletSpacing} m spacing.`)
+    }
+  }
 
   // ---- Recirculation fans (Addendum C.9) -----------------------------------
   const recircSpacing = get('recirc_fan_spacing_m', 30)

@@ -57,8 +57,8 @@ export const PRODUCT_INFO: Record<string, ProductInfo> = {
   AIR_INLET: {
     unit: { en: 'inlets', ar: 'شباك' },
     desc: {
-      en: 'UTC air inlet (Turkish "Airanlit" brand), size 56 × 26 cm. Fitted with graduated angle bracket for controlled opening angle. Includes full suspension and installation accessories, with 1 actuator motor per side wall.',
-      ar: 'شباك إيرانلت تركي UTC، مقاس 56 × 26 سم. الشباك مزود بزاوية تدريج تسمح بالتحكم بزاوية فتح الشباك. يشمل اكسسوارات التعليق والتركيب كاملة مع المواتير — ماتور 1 لكل جنب.',
+      en: 'UTC air inlet (Turkish "Airanlit" brand), size 55 × 26 cm. Fitted with graduated angle bracket for controlled opening angle. Includes full suspension and installation accessories, with 1 actuator motor per side wall.',
+      ar: 'شباك إيرانلت تركي UTC، مقاس 55 × 26 سم. الشباك مزود بزاوية تدريج تسمح بالتحكم بزاوية فتح الشباك. يشمل اكسسوارات التعليق والتركيب كاملة مع المواتير — ماتور 1 لكل جنب.',
     },
   },
   TUNNEL_INLET: {

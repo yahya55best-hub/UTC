@@ -59,7 +59,9 @@ export function HouseSizingPanel({
         p.tunnel_fan_model_id ??
         eng.fans.find((f) => (f.fan_type === 'TUNNEL' || f.fan_type === 'EXHAUST') && f.capacity_m3h != null)?.id,
       side_fan_model_id:
-        p.side_fan_model_id ?? eng.fans.find((f) => f.fan_type === 'SIDE' && f.capacity_m3h != null)?.id,
+        p.side_fan_model_id ??
+        (eng.fans.find((f) => f.fan_type === 'SIDE' && /EWS\s*42/i.test(f.name) && f.capacity_m3h != null) ??
+          eng.fans.find((f) => f.fan_type === 'SIDE' && f.capacity_m3h != null))?.id,
       recirc_fan_model_id: p.recirc_fan_model_id ?? eng.fans.find((f) => f.fan_type === 'CIRCULATION')?.id,
       cooling_pad_model_id: p.cooling_pad_model_id ?? eng.pads[0]?.id,
       heater_model_id: p.heater_model_id ?? eng.heaters[0]?.id,

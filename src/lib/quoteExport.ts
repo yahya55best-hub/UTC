@@ -24,8 +24,8 @@ export interface QuoteExportArgs {
 const labels = (lang: DocLang) => (lang === 'ar' ? ar : en) as unknown as typeof en
 const safeName = (s: string) => s.replace(/[^\w\d-]+/g, '_').slice(0, 40)
 const EXCLUDED_NOTE: Bilingual = {
-  en: 'Electrical cables and lighting systems are excluded from this quote scope — to be determined separately.',
-  ar: 'الكابلات الكهربائية وأنظمة الإضاءة غير مشمولة في نطاق هذا العرض — تُحدَّد بشكل منفصل.',
+  en: 'Electrical cables are excluded from this quote scope. Lighting quantities are indicative only (line count matches feeding lines); lighting pricing is excluded — to be determined separately per the HATO light plan.',
+  ar: 'الكابلات الكهربائية غير مشمولة في نطاق هذا العرض. كميات الإضاءة استرشادية فقط (عدد الخطوط مطابق لخطوط التغذية)؛ تسعير الإضاءة غير مشمول — يُحدَّد بشكل منفصل وفق خطة إضاءة HATO.',
 }
 interface Bilingual { en: string; ar: string }
 
