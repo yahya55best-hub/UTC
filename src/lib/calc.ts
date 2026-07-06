@@ -364,55 +364,48 @@ export function runEngine(input: CalcInputs, data: EngineData): CalcResult {
     )
   }
 
-  // ---- Side ventilation (Addendum C.7) -------------------------------------
-  const birdReq = get('bird_requirement_m3h_per_bird', 4)
-  let requiredSide: number | null = null
-  if (birds != null) {
-    requiredSide = round(birdReq * birds)
-    metrics.push({
-      section: 'Ventilation',
-      label: 'Required side airflow',
-      value: requiredSide,
-      unit: 'm³/h',
-      formula: `${birdReq} m³/h/bird × ${fmt(birds)} birds = ${fmt(requiredSide)} m³/h`,
-    })
-    const sideFan = data.fans.find((f) => f.id === input.side_fan_model_id)
-    if (sideFan) {
-      if (sideFan.capacity_m3h == null) {
-        warnings.push(`Side fan "${sideFan.name}" has no capacity set.`)
-      } else {
-        const count = ceil(requiredSide / sideFan.capacity_m3h)
-        addProposal(
-          proposals, 'Ventilation', 'Side fans', brandName(data, sideFan.brand_id),
-          `${sideFan.name} — side fan`, 'PER_UNIT', count,
-          `ceil(${fmt(requiredSide)} / ${fmt(sideFan.capacity_m3h)}) = ${count}`,
-          { itemKey: 'SIDE_FAN' },
-        )
-      }
-    }
+  // ---- Side ventilation — minimum/transitional (air-changes-per-hour) ------
+  // Independent path: does NOT feed pads/inlets/channels. Uses house volume ×
+  // ACH, not the tunnel/bird formula.
+  const ach = get('side_vent_ach', 14)
+  const hAvg = input.ridge_height_m
+    ? round((input.eave_height_m + input.ridge_height_m) / 2, 3)
+    : input.eave_height_m
+  const houseVolume = round(L * W * hAvg, 1)
+  const minVent = round(houseVolume * ach)
+  metrics.push({ section: 'Ventilation', label: 'House volume', value: houseVolume, unit: 'm³', formula: `${fmt(L)} × ${fmt(W)} × ${fmt(hAvg, 2)} = ${fmt(houseVolume, 1)} m³` })
+  metrics.push({ section: 'Ventilation', label: 'Min ventilation airflow', value: minVent, unit: 'm³/h', formula: `${fmt(houseVolume, 1)} × ${ach} ACH = ${fmt(minVent)} m³/h` })
+  const sideFan = data.fans.find((f) => f.id === input.side_fan_model_id)
+  if (!sideFan) {
+    warnings.push('Select a side fan model to size side ventilation.')
+  } else if (sideFan.capacity_m3h == null) {
+    warnings.push(`Side fan "${sideFan.name}" has no capacity set.`)
   } else {
-    warnings.push('Bird count is needed for side-ventilation sizing.')
+    const sideFans = ceil(minVent / sideFan.capacity_m3h)
+    addProposal(
+      proposals, 'Ventilation', 'Side fans', brandName(data, sideFan.brand_id),
+      `${sideFan.name} — side fan`, 'PER_UNIT', sideFans,
+      `ceil(${fmt(minVent)} / ${fmt(sideFan.capacity_m3h)}) = ${sideFans}`,
+      { itemKey: 'SIDE_FAN' },
+    )
   }
 
-  // ---- Air inlets — airflow/area-driven (3 m spacing = placement + max) -----
-  // Count = required inlet area / area-per-inlet, rounded up to an even total
-  // (equal split across 2 side walls). Reads structured width_m × height_m from
-  // the selected model — never parses dimensions from text. Reactive to inlet
-  // model, side fan model/capacity, and the three inlet settings.
+  // ---- Air inlets — sized on FULL tunnel capacity at inlet velocity --------
+  // designAirflow = tunnelFans × tunnelFanCapacity; area = design/(3600×vel);
+  // count = ceil(area / (width×height)) rounded up to nearest EVEN (2 walls).
+  // Reads structured width_m × height_m — never parses dimensions from text.
   const inlet = data.inlets.find((m) => m.id === input.air_inlet_model_id)
-  const sideFanInlet = data.fans.find((f) => f.id === input.side_fan_model_id)
-  const inletVel = get('inlet_air_velocity_ms', 3)
-  const sizingFans = get('inlet_sizing_side_fans', 3)
+  const inletVel = get('inlet_air_velocity_ms', 5)
   const inletSpacing = get('air_inlet_spacing_m', 3)
   if (!inlet) {
     warnings.push('Select an air inlet model to size air inlets.')
   } else if (inlet.width_m == null || inlet.height_m == null) {
     warnings.push(`Air inlet "${inlet.name}" has no width/height set — cannot size inlets (enter width_m × height_m).`)
-  } else if (sideFanInlet?.capacity_m3h == null) {
-    warnings.push('Select a side fan model (with capacity) to size air inlets.')
+  } else if (tunnelFanCount == null || tunnelFan?.capacity_m3h == null) {
+    warnings.push('Select a tunnel fan model (with capacity) to size air inlets.')
   } else {
-    const sideCap = sideFanInlet.capacity_m3h
-    const designAirflow = sizingFans * sideCap
+    const tunnelCap = tunnelFan.capacity_m3h
+    const designAirflow = tunnelFanCount * tunnelCap
     const areaReq = designAirflow / (3600 * inletVel)
     const areaPerInlet = inlet.width_m * inlet.height_m
     const rawInlets = ceil(areaReq / areaPerInlet)
@@ -420,7 +413,7 @@ export function runEngine(input: CalcInputs, data: EngineData): CalcResult {
     const inletsPerSide = totalInlets / 2
     const maxPerSide = floor(L / inletSpacing)
 
-    metrics.push({ section: 'Ventilation', label: 'Inlet design airflow', value: designAirflow, unit: 'm³/h', formula: `${sizingFans} side fans × ${fmt(sideCap)} = ${fmt(designAirflow)} m³/h` })
+    metrics.push({ section: 'Ventilation', label: 'Inlet design airflow', value: designAirflow, unit: 'm³/h', formula: `${tunnelFanCount} tunnel fans × ${fmt(tunnelCap)} = ${fmt(designAirflow)} m³/h` })
     metrics.push({ section: 'Ventilation', label: 'Inlet area required', value: round(areaReq, 3), unit: 'm²', formula: `${fmt(designAirflow)} / (3600 × ${inletVel}) = ${fmt(areaReq, 2)} m²` })
     metrics.push({ section: 'Ventilation', label: 'Area per inlet', value: round(areaPerInlet, 4), unit: 'm²', formula: `${inlet.width_m} × ${inlet.height_m} = ${fmt(areaPerInlet, 4)} m²` })
     metrics.push({ section: 'Ventilation', label: 'Raw inlets', value: rawInlets, unit: 'inlets', formula: `ceil(${fmt(areaReq, 2)} / ${fmt(areaPerInlet, 4)}) = ${rawInlets}` })
@@ -430,7 +423,7 @@ export function runEngine(input: CalcInputs, data: EngineData): CalcResult {
     addProposal(
       proposals, 'Ventilation', 'Air inlet windows', brandName(data, inlet.brand_id),
       `${inlet.name} — air inlet`, 'PER_UNIT', totalInlets,
-      `${sizingFans}×${fmt(sideCap)} / (3600×${inletVel}) = ${fmt(areaReq, 2)} m² ÷ ${fmt(areaPerInlet, 4)} = ${rawInlets} → even ${totalInlets} (${inletsPerSide}/side)`,
+      `${tunnelFanCount}×${fmt(tunnelCap)} / (3600×${inletVel}) = ${fmt(areaReq, 2)} m² ÷ ${fmt(areaPerInlet, 4)} = ${rawInlets} → even ${totalInlets} (${inletsPerSide}/side)`,
       { itemKey: 'AIR_INLET' },
     )
     if (inletsPerSide > maxPerSide) {
