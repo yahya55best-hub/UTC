@@ -139,6 +139,10 @@ export function runEngine(input: CalcInputs, data: EngineData): CalcResult {
   const L = input.length_m
   const W = input.width_m
   const area = round(L * W, 1)
+  // Average internal height H_avg = (side + mid) / 2; if only one height, use it.
+  const hAvg = input.ridge_height_m
+    ? round((input.eave_height_m + input.ridge_height_m) / 2, 3)
+    : input.eave_height_m
 
   metrics.push({
     section: 'House',
@@ -232,7 +236,7 @@ export function runEngine(input: CalcInputs, data: EngineData): CalcResult {
   }
 
   // Effective line length = house length − front/back clearance (1.5 m each end).
-  const clearance = get('pipe_clearance_total_m', 3)
+  const clearance = get('house_end_clearance_m', get('pipe_clearance_total_m', 3))
   const effLen = Math.max(0, round(L - clearance, 2))
 
   // ---- Feeding (ROXELL NEW MiniMax pan feeder) -----------------------------
@@ -263,7 +267,7 @@ export function runEngine(input: CalcInputs, data: EngineData): CalcResult {
   else if (W > 13) waterLines = get('water_lines_above_13', 5)
   else warnings.push(`Width ${fmt(W)} m < 11 m: no default water-line rule — set water lines manually.`)
   if (waterLines > 0) {
-    const waterPipe = get('water_pipe_len_m', 3)
+    const waterPipe = get('drink_pipe_len_m', get('water_pipe_len_m', 3))
     const nipplesPerPipe = get('nipples_per_pipe', 15)
     // Drinking pipes per line = feeding pipes per line + 1 (always exactly one more).
     const waterPipesPerLine = (feedPipesPerLine > 0 ? feedPipesPerLine : ceil(effLen / waterPipe)) + 1
@@ -282,17 +286,25 @@ export function runEngine(input: CalcInputs, data: EngineData): CalcResult {
     metrics.push({ section: 'Feeding & drinking', label: 'Water line length', value: waterLineLen, unit: 'm', formula: `${waterPipesPerLine} × ${waterPipe} m` })
   }
 
-  // ---- Tunnel ventilation (Addendum C.5) -----------------------------------
-  const speed = input.tunnel_air_speed_ms ?? get('tunnel_air_speed_ms', 3.0)
-  const openH = input.effective_opening_height_m ?? get('effective_opening_height_m', 2.0)
-  const openingArea = round(W * openH, 2)
-  const tunnelAirflow = round(openingArea * speed * 3600)
+  // ---- Tunnel ventilation — cross-section × target airspeed (length-free) ---
+  // tunnelFans = ceil(W × H_avg × airspeed × 3600 / capacity). Length must not
+  // appear: same W×H_avg gives the same fan count for any house length.
+  const airspeed = get('tunnel_target_airspeed_ms', 2.6)
+  const crossSection = round(W * hAvg, 3)
+  const tunnelAirflow = round(crossSection * airspeed * 3600)
   metrics.push({
     section: 'Ventilation',
-    label: 'Tunnel airflow',
+    label: 'Tunnel cross-section',
+    value: crossSection,
+    unit: 'm²',
+    formula: `${fmt(W)} × ${fmt(hAvg, 2)} (H_avg) = ${fmt(crossSection, 2)} m²`,
+  })
+  metrics.push({
+    section: 'Ventilation',
+    label: 'Tunnel design airflow',
     value: tunnelAirflow,
     unit: 'm³/h',
-    formula: `(${fmt(W)} × ${fmt(openH)}) m² × ${speed} m/s × 3600 = ${fmt(tunnelAirflow)} m³/h`,
+    formula: `${fmt(crossSection, 2)} × ${airspeed} m/s × 3600 = ${fmt(tunnelAirflow)} m³/h`,
   })
   const tunnelFan = data.fans.find((f) => f.id === input.tunnel_fan_model_id)
   let tunnelFanCount: number | null = null
@@ -368,9 +380,6 @@ export function runEngine(input: CalcInputs, data: EngineData): CalcResult {
   // Independent path: does NOT feed pads/inlets/channels. Uses house volume ×
   // ACH, not the tunnel/bird formula.
   const ach = get('side_vent_ach', 14)
-  const hAvg = input.ridge_height_m
-    ? round((input.eave_height_m + input.ridge_height_m) / 2, 3)
-    : input.eave_height_m
   const houseVolume = round(L * W * hAvg, 1)
   const minVent = round(houseVolume * ach)
   metrics.push({ section: 'Ventilation', label: 'House volume', value: houseVolume, unit: 'm³', formula: `${fmt(L)} × ${fmt(W)} × ${fmt(hAvg, 2)} = ${fmt(houseVolume, 1)} m³` })
@@ -390,10 +399,9 @@ export function runEngine(input: CalcInputs, data: EngineData): CalcResult {
     )
   }
 
-  // ---- Air inlets — sized on FULL tunnel capacity at inlet velocity --------
-  // designAirflow = tunnelFans × tunnelFanCapacity; area = design/(3600×vel);
-  // count = ceil(area / (width×height)) rounded up to nearest EVEN (2 walls).
-  // Reads structured width_m × height_m — never parses dimensions from text.
+  // ---- Air inlet windows — MIN-VENT (not tunnel; tunnel air enters via pads) -
+  // Uses the same minimum-ventilation airflow as the side fans (house volume ×
+  // ACH), sized at inlet velocity over the model's structured width × height.
   const inlet = data.inlets.find((m) => m.id === input.air_inlet_model_id)
   const inletVel = get('inlet_air_velocity_ms', 5)
   const inletSpacing = get('air_inlet_spacing_m', 3)
@@ -401,20 +409,15 @@ export function runEngine(input: CalcInputs, data: EngineData): CalcResult {
     warnings.push('Select an air inlet model to size air inlets.')
   } else if (inlet.width_m == null || inlet.height_m == null) {
     warnings.push(`Air inlet "${inlet.name}" has no width/height set — cannot size inlets (enter width_m × height_m).`)
-  } else if (tunnelFanCount == null || tunnelFan?.capacity_m3h == null) {
-    warnings.push('Select a tunnel fan model (with capacity) to size air inlets.')
   } else {
-    const tunnelCap = tunnelFan.capacity_m3h
-    const designAirflow = tunnelFanCount * tunnelCap
-    const areaReq = designAirflow / (3600 * inletVel)
+    const areaReq = minVent / (3600 * inletVel)
     const areaPerInlet = inlet.width_m * inlet.height_m
     const rawInlets = ceil(areaReq / areaPerInlet)
     const totalInlets = rawInlets % 2 === 0 ? rawInlets : rawInlets + 1
     const inletsPerSide = totalInlets / 2
     const maxPerSide = floor(L / inletSpacing)
 
-    metrics.push({ section: 'Ventilation', label: 'Inlet design airflow', value: designAirflow, unit: 'm³/h', formula: `${tunnelFanCount} tunnel fans × ${fmt(tunnelCap)} = ${fmt(designAirflow)} m³/h` })
-    metrics.push({ section: 'Ventilation', label: 'Inlet area required', value: round(areaReq, 3), unit: 'm²', formula: `${fmt(designAirflow)} / (3600 × ${inletVel}) = ${fmt(areaReq, 2)} m²` })
+    metrics.push({ section: 'Ventilation', label: 'Inlet area required', value: round(areaReq, 3), unit: 'm²', formula: `${fmt(minVent)} (min-vent) / (3600 × ${inletVel}) = ${fmt(areaReq, 2)} m²` })
     metrics.push({ section: 'Ventilation', label: 'Area per inlet', value: round(areaPerInlet, 4), unit: 'm²', formula: `${inlet.width_m} × ${inlet.height_m} = ${fmt(areaPerInlet, 4)} m²` })
     metrics.push({ section: 'Ventilation', label: 'Raw inlets', value: rawInlets, unit: 'inlets', formula: `ceil(${fmt(areaReq, 2)} / ${fmt(areaPerInlet, 4)}) = ${rawInlets}` })
     metrics.push({ section: 'Ventilation', label: 'Inlets per side', value: inletsPerSide, unit: 'inlets', formula: `${totalInlets} / 2 sides = ${inletsPerSide}` })
@@ -423,7 +426,7 @@ export function runEngine(input: CalcInputs, data: EngineData): CalcResult {
     addProposal(
       proposals, 'Ventilation', 'Air inlet windows', brandName(data, inlet.brand_id),
       `${inlet.name} — air inlet`, 'PER_UNIT', totalInlets,
-      `${tunnelFanCount}×${fmt(tunnelCap)} / (3600×${inletVel}) = ${fmt(areaReq, 2)} m² ÷ ${fmt(areaPerInlet, 4)} = ${rawInlets} → even ${totalInlets} (${inletsPerSide}/side)`,
+      `min-vent ${fmt(minVent)} / (3600×${inletVel}) = ${fmt(areaReq, 2)} m² ÷ ${fmt(areaPerInlet, 4)} = ${rawInlets} → even ${totalInlets} (${inletsPerSide}/side)`,
       { itemKey: 'AIR_INLET' },
     )
     if (inletsPerSide > maxPerSide) {

@@ -57,7 +57,8 @@ export function HouseSizingPanel({
       ...p,
       tunnel_fan_model_id:
         p.tunnel_fan_model_id ??
-        eng.fans.find((f) => (f.fan_type === 'TUNNEL' || f.fan_type === 'EXHAUST') && f.capacity_m3h != null)?.id,
+        (eng.fans.find((f) => f.name === 'Pericoli EWS 53' && f.capacity_m3h != null) ??
+          eng.fans.find((f) => (f.fan_type === 'TUNNEL' || f.fan_type === 'EXHAUST') && f.capacity_m3h != null))?.id,
       side_fan_model_id:
         p.side_fan_model_id ??
         (eng.fans.find((f) => f.fan_type === 'SIDE' && /EWS\s*42/i.test(f.name) && f.capacity_m3h != null) ??
