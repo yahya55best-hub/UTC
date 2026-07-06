@@ -1,5 +1,5 @@
 ﻿-- UTC CPQ — full_setup.sql
--- AUTO-CONCATENATED: migrations 0001-0012 + catalog seed, in dependency order.
+-- AUTO-CONCATENATED: migrations 0001-0013 + catalog seed, in dependency order.
 -- Paste into the Supabase SQL Editor and Run on a FRESH project.
 
 
@@ -1425,5 +1425,20 @@ insert into public.fan_models (name, fan_type, diameter_in, capacity_m3h, power_
 select 'Multifan box 130', 'TUNNEL', 51, 44600, null, b.id, 'Galvanised box fan 130 cm, 44600 m³/h.'
 from public.brands b where b.name = 'Multifan'
 on conflict (name) do nothing;
+
+
+-- ============================================================================
+-- >>> 0013_inlet_perside_and_heater_spacing.sql
+-- ============================================================================
+-- ============================================================================
+-- UTC CPQ — 0013 inlet per-side ×2 + heater spacing 30
+-- Air-inlet count fix is code-only (the area formula is per-side, then ×2).
+-- Heaters now use a 30 m spacing setting, rounded to nearest.
+-- Idempotent.
+-- ============================================================================
+
+insert into public.calc_settings (key, value, unit, category, description) values
+  ('heater_spacing_m', 30, 'm', 'heating', 'House length per heater (round to nearest)')
+on conflict (key) do nothing;
 
 

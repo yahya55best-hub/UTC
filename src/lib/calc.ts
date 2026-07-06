@@ -410,23 +410,24 @@ export function runEngine(input: CalcInputs, data: EngineData): CalcResult {
   } else if (inlet.width_m == null || inlet.height_m == null) {
     warnings.push(`Air inlet "${inlet.name}" has no width/height set — cannot size inlets (enter width_m × height_m).`)
   } else {
+    // The area requirement yields the count for ONE side; total = perSide × 2.
     const areaReq = minVent / (3600 * inletVel)
     const areaPerInlet = inlet.width_m * inlet.height_m
-    const rawInlets = ceil(areaReq / areaPerInlet)
-    const totalInlets = rawInlets % 2 === 0 ? rawInlets : rawInlets + 1
-    const inletsPerSide = totalInlets / 2
+    const rawPerSide = ceil(areaReq / areaPerInlet)
+    const inletsPerSide = rawPerSide % 2 === 0 ? rawPerSide : rawPerSide + 1
+    const totalInlets = inletsPerSide * 2
     const maxPerSide = floor(L / inletSpacing)
 
     metrics.push({ section: 'Ventilation', label: 'Inlet area required', value: round(areaReq, 3), unit: 'm²', formula: `${fmt(minVent)} (min-vent) / (3600 × ${inletVel}) = ${fmt(areaReq, 2)} m²` })
     metrics.push({ section: 'Ventilation', label: 'Area per inlet', value: round(areaPerInlet, 4), unit: 'm²', formula: `${inlet.width_m} × ${inlet.height_m} = ${fmt(areaPerInlet, 4)} m²` })
-    metrics.push({ section: 'Ventilation', label: 'Raw inlets', value: rawInlets, unit: 'inlets', formula: `ceil(${fmt(areaReq, 2)} / ${fmt(areaPerInlet, 4)}) = ${rawInlets}` })
-    metrics.push({ section: 'Ventilation', label: 'Inlets per side', value: inletsPerSide, unit: 'inlets', formula: `${totalInlets} / 2 sides = ${inletsPerSide}` })
+    metrics.push({ section: 'Ventilation', label: 'Raw inlets per side', value: rawPerSide, unit: 'inlets', formula: `ceil(${fmt(areaReq, 2)} / ${fmt(areaPerInlet, 4)}) = ${rawPerSide}` })
+    metrics.push({ section: 'Ventilation', label: 'Inlets per side (even)', value: inletsPerSide, unit: 'inlets', formula: `${rawPerSide} → even ${inletsPerSide}` })
     metrics.push({ section: 'Ventilation', label: 'Spacing ceiling per side', value: maxPerSide, unit: 'inlets', formula: `floor(${fmt(L)} / ${inletSpacing}) = ${maxPerSide}${inletsPerSide > maxPerSide ? ' — EXCEEDED' : ' — ok'}` })
 
     addProposal(
       proposals, 'Ventilation', 'Air inlet windows', brandName(data, inlet.brand_id),
       `${inlet.name} — air inlet`, 'PER_UNIT', totalInlets,
-      `min-vent ${fmt(minVent)} / (3600×${inletVel}) = ${fmt(areaReq, 2)} m² ÷ ${fmt(areaPerInlet, 4)} = ${rawInlets} → even ${totalInlets} (${inletsPerSide}/side)`,
+      `min-vent ${fmt(minVent)} / (3600×${inletVel}) = ${fmt(areaReq, 2)} m² ÷ ${fmt(areaPerInlet, 4)} = ${rawPerSide}/side → even ${inletsPerSide} × 2 = ${totalInlets}`,
       { itemKey: 'AIR_INLET' },
     )
     if (inletsPerSide > maxPerSide) {
@@ -445,14 +446,14 @@ export function runEngine(input: CalcInputs, data: EngineData): CalcResult {
     { itemKey: 'CIRC_FAN' },
   )
 
-  // ---- Heating (Addendum C.10) ---------------------------------------------
+  // ---- Heating — house length / spacing, rounded to NEAREST ----------------
   const heater = data.heaters.find((h) => h.id === input.heater_model_id)
-  const coverage = heater?.coverage_m ?? get('heater_coverage_m', 27.5)
-  const heaterCount = ceil(L / coverage)
+  const heaterSpacing = get('heater_spacing_m', 30)
+  const heaterCount = Math.round(L / heaterSpacing)
   addProposal(
     proposals, 'Heating', 'Heaters', heater ? brandName(data, heater.brand_id) : 'UTC.stav',
     heater ? `${heater.name}` : 'UTC heater', 'PER_UNIT', heaterCount,
-    `ceil(${fmt(L)} / ${coverage}) = ${heaterCount}`,
+    `round(${fmt(L)} / ${heaterSpacing}) = ${heaterCount}`,
     { itemKey: 'HEATER' },
   )
 
