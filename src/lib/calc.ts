@@ -81,6 +81,8 @@ export interface Proposal {
   formula: string
   /** Links to PRODUCT_INFO for the bilingual description + custom unit label. */
   itemKey?: string
+  /** Extra structured values carried onto the line's calc_meta (e.g. end sets). */
+  meta?: Record<string, unknown>
   warning?: string
 }
 
@@ -274,16 +276,21 @@ export function runEngine(input: CalcInputs, data: EngineData): CalcResult {
     const waterTotalPipes = waterPipesPerLine * waterLines
     const totalNipples = waterTotalPipes * nipplesPerPipe
     const waterLineLen = round(waterPipesPerLine * waterPipe, 1)
+    // End sets: lines over 60 m need 2 per line, otherwise 1 (60 m exactly = 1).
+    const endSetsPerLine = waterLineLen > 60 ? 2 : 1
+    const endSetsTotal = endSetsPerLine * waterLines
     addProposal(
       proposals, 'Feeding & drinking', 'Drinking line', input.water_brand ?? 'Roxell',
       'Drinking line (ROXELL nipple)', 'PER_UNIT', waterLines,
-      `${waterPipesPerLine} pipes/line (feed ${feedPipesPerLine} + 1) → ${waterTotalPipes} pipes total (≈${fmt(waterLineLen, 1)} m)`,
-      { itemKey: 'DRINKING' },
+      `${waterPipesPerLine} pipes/line (feed ${feedPipesPerLine} + 1) → ${waterTotalPipes} pipes total (≈${fmt(waterLineLen, 1)} m); ${endSetsPerLine} end set(s)/line`,
+      { itemKey: 'DRINKING', meta: { endSetsPerLine, endSetsTotal, lineLength: waterLineLen } },
     )
     metrics.push({ section: 'Feeding & drinking', label: 'Water pipes per line', value: waterPipesPerLine, unit: 'pipes', formula: `feeding ${feedPipesPerLine} + 1 = ${waterPipesPerLine}` })
     metrics.push({ section: 'Feeding & drinking', label: 'Water pipes total', value: waterTotalPipes, unit: 'pipes', formula: `${waterPipesPerLine} × ${waterLines} lines = ${waterTotalPipes}` })
     metrics.push({ section: 'Feeding & drinking', label: 'Total nipples', value: totalNipples, unit: 'nipples', formula: `${waterTotalPipes} pipes × ${nipplesPerPipe} (≈20 cm spacing) = ${fmt(totalNipples)}` })
     metrics.push({ section: 'Feeding & drinking', label: 'Water line length', value: waterLineLen, unit: 'm', formula: `${waterPipesPerLine} × ${waterPipe} m` })
+    metrics.push({ section: 'Feeding & drinking', label: 'End sets per line', value: endSetsPerLine, unit: 'sets', formula: `${fmt(waterLineLen, 1)} m ${waterLineLen > 60 ? '> 60 → 2' : '≤ 60 → 1'}` })
+    metrics.push({ section: 'Feeding & drinking', label: 'End sets total', value: endSetsTotal, unit: 'sets', formula: `${endSetsPerLine} × ${waterLines} lines = ${endSetsTotal}` })
   }
 
   // ---- Tunnel ventilation — cross-section × target airspeed (length-free) ---
@@ -495,7 +502,7 @@ function addProposal(
   unit: UnitType,
   quantity: number,
   formula: string,
-  opts: { itemKey?: string; warning?: string } = {},
+  opts: { itemKey?: string; warning?: string; meta?: Record<string, unknown> } = {},
 ) {
   arr.push({
     key: `${section}:${label}`.replace(/\s+/g, '_'),
@@ -507,6 +514,7 @@ function addProposal(
     quantity,
     formula,
     itemKey: opts.itemKey,
+    meta: opts.meta,
     warning: opts.warning,
   })
 }

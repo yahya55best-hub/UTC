@@ -185,7 +185,7 @@ export function QuoteEditorPage() {
       is_installation: false,
       notes: p.formula,
       calc_source: 'ENGINE',
-      calc_meta: { section: p.section, label: p.label, formula: p.formula, itemKey: p.itemKey, inputs },
+      calc_meta: { section: p.section, label: p.label, formula: p.formula, itemKey: p.itemKey, ...(p.meta ?? {}), inputs },
     }))
     setLines((prev) => [...prev, ...newLines])
     setShowCalc(false)

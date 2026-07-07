@@ -40,6 +40,20 @@ function lineInfo(
 }
 const unitLabel = (L: typeof en, u: string | null) =>
   u ? (L.enums.unit as Record<string, string>)[u] ?? '' : ''
+
+/** Dynamic, length-aware note (e.g. drinking-line end sets) from calc_meta. */
+function extraNote(l: { calc_meta?: Record<string, unknown> | null }, lang: DocLang): string | null {
+  const m = l.calc_meta
+  if (!m) return null
+  if (m.itemKey === 'DRINKING' && typeof m.endSetsPerLine === 'number') {
+    const eps = m.endSetsPerLine
+    const len = typeof m.lineLength === 'number' ? m.lineLength : '—'
+    return lang === 'ar'
+      ? `كل خط شرب مزود بعدد ${eps} مجموعة نهاية خط (طول الخط ${len} م — الخطوط التي تزيد عن 60 م تحتاج مجموعتين نهاية خط).`
+      : `Each drinking line includes ${eps} end set(s) (${len} m line — lines over 60 m require 2 end sets).`
+  }
+  return null
+}
 const houseLabel = (L: typeof en, h: string | null) =>
   h ? (L.enums.houseType as Record<string, string>)[h] ?? '' : '—'
 
@@ -86,7 +100,10 @@ function buildContainer({ quote, customer, lines, currency, lang }: QuoteExportA
     .map((l) => {
       const info = lineInfo(l, lang)
       const unitText = info?.unit ?? unitLabel(L, l.unit)
-      const descBlock = info ? `<div style="color:#666;font-size:10.5px;margin-top:2px">${escapeHtml(info.desc)}</div>` : ''
+      const note = extraNote(l, lang)
+      const descBlock =
+        (info ? `<div style="color:#666;font-size:10.5px;margin-top:2px">${escapeHtml(info.desc)}</div>` : '') +
+        (note ? `<div style="color:#666;font-size:10.5px;margin-top:2px">${escapeHtml(note)}</div>` : '')
       return `<tr>
         <td style="padding:7px 8px;border-bottom:1px solid #eee;text-align:${sA};vertical-align:top">${escapeHtml(l.is_installation ? L.quote.installation : l.brand_snapshot)}</td>
         <td style="padding:7px 8px;border-bottom:1px solid #eee;text-align:${sA};vertical-align:top"><div style="font-weight:600">${escapeHtml(l.description_snapshot)}</div>${descBlock}${l.notes ? `<div style="color:#999;font-size:10px;margin-top:2px">${escapeHtml(l.notes)}</div>` : ''}</td>
@@ -240,6 +257,8 @@ export async function downloadQuoteDocx({ quote, customer, lines, currency, lang
       new Paragraph({ alignment: align, bidirectional: rtl, children: [new TextRun({ text: l.description_snapshot, bold: true, rightToLeft: rtl, size: 19 })] }),
     ]
     if (info) paras.push(new Paragraph({ alignment: align, bidirectional: rtl, children: [new TextRun({ text: info.desc, color: '666666', rightToLeft: rtl, size: 15 })] }))
+    const note = extraNote(l, lang)
+    if (note) paras.push(new Paragraph({ alignment: align, bidirectional: rtl, children: [new TextRun({ text: note, color: '666666', rightToLeft: rtl, size: 15 })] }))
     if (l.notes) paras.push(new Paragraph({ alignment: align, bidirectional: rtl, children: [new TextRun({ text: l.notes, color: '999999', rightToLeft: rtl, size: 14 })] }))
     return new TableCell({ margins: { top: 60, bottom: 60, left: 80, right: 80 }, children: paras })
   }
