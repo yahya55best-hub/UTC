@@ -1,5 +1,5 @@
 ﻿-- UTC CPQ — full_setup.sql
--- AUTO-CONCATENATED: migrations 0001-0013 + catalog seed, in dependency order.
+-- AUTO-CONCATENATED: migrations 0001-0014 + catalog seed, in dependency order.
 -- Paste into the Supabase SQL Editor and Run on a FRESH project.
 
 
@@ -1439,6 +1439,20 @@ on conflict (name) do nothing;
 
 insert into public.calc_settings (key, value, unit, category, description) values
   ('heater_spacing_m', 30, 'm', 'heating', 'House length per heater (round to nearest)')
+on conflict (key) do nothing;
+
+
+-- ============================================================================
+-- >>> 0014_feed_clearance.sql
+-- ============================================================================
+-- ============================================================================
+-- UTC CPQ — 0014 feeding line clearance
+-- Feeding/drinking line length = house − feed_line_clearance_m (default 6 m,
+-- 3 m front + 3 m back for the line motor and the hopper). Idempotent.
+-- ============================================================================
+
+insert into public.calc_settings (key, value, unit, category, description) values
+  ('feed_line_clearance_m', 6, 'm', 'feeding', 'Feeding line clearance total (3 m front + 3 m back for motor + hopper)')
 on conflict (key) do nothing;
 
 

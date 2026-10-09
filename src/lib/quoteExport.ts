@@ -81,10 +81,31 @@ function preload(src: string): Promise<void> {
   })
 }
 
+/** Internal lines are kept in the dealer's view but excluded from the customer doc. */
+function isInternal(l: QuoteLine): boolean {
+  return !!(l.calc_meta && (l.calc_meta as Record<string, unknown>).internal === true)
+}
+/** Unit label: product info → manual unitLabel → enum fallback. */
+function unitText(l: QuoteLine, lang: DocLang, L: typeof en): string {
+  const info = lineInfo(l, lang)
+  if (info) return info.unit
+  const ul = l.calc_meta && (l.calc_meta as Record<string, unknown>).unitLabel
+  if (typeof ul === 'string' && ul) return ul
+  return unitLabel(L, l.unit)
+}
+/** Totals computed from the given (visible) lines only. */
+function totalsOf(lines: QuoteLine[]): { subtotal: number; total: number } {
+  const subtotal = lines.filter((l) => !l.is_installation).reduce((s, l) => s + Number(l.line_total), 0)
+  const total = lines.reduce((s, l) => s + Number(l.line_total), 0)
+  return { subtotal: Math.round(subtotal * 100) / 100, total: Math.round(total * 100) / 100 }
+}
+
 // ===========================================================================
 // PDF — rasterized via html2canvas so Arabic shapes/joins and renders RTL.
 // ===========================================================================
 function buildContainer({ quote, customer, lines, currency, lang }: QuoteExportArgs): HTMLDivElement {
+  const visibleLines = lines.filter((l) => !isInternal(l))
+  const totals = totalsOf(visibleLines)
   const L = labels(lang)
   const rtl = lang === 'ar'
   const dir = rtl ? 'rtl' : 'ltr'
@@ -94,12 +115,12 @@ function buildContainer({ quote, customer, lines, currency, lang }: QuoteExportA
     ? "'Segoe UI','Tahoma','Noto Naskh Arabic',Arial,sans-serif"
     : "'Segoe UI',Arial,sans-serif"
 
-  const rows = lines
+  const rows = visibleLines
     .slice()
     .sort((a, b) => a.sort_order - b.sort_order)
     .map((l) => {
       const info = lineInfo(l, lang)
-      const unitText = info?.unit ?? unitLabel(L, l.unit)
+      const uText = unitText(l, lang, L)
       const note = extraNote(l, lang)
       const descBlock =
         (info ? `<div style="color:#666;font-size:10.5px;margin-top:2px">${escapeHtml(info.desc)}</div>` : '') +
@@ -108,7 +129,7 @@ function buildContainer({ quote, customer, lines, currency, lang }: QuoteExportA
         <td style="padding:7px 8px;border-bottom:1px solid #eee;text-align:${sA};vertical-align:top">${escapeHtml(l.is_installation ? L.quote.installation : l.brand_snapshot)}</td>
         <td style="padding:7px 8px;border-bottom:1px solid #eee;text-align:${sA};vertical-align:top"><div style="font-weight:600">${escapeHtml(l.description_snapshot)}</div>${descBlock}${l.notes ? `<div style="color:#999;font-size:10px;margin-top:2px">${escapeHtml(l.notes)}</div>` : ''}</td>
         <td style="padding:7px 8px;border-bottom:1px solid #eee;text-align:${eA};vertical-align:top">${l.is_installation ? '' : Number(l.quantity).toLocaleString()}</td>
-        <td style="padding:7px 8px;border-bottom:1px solid #eee;text-align:${sA};vertical-align:top">${escapeHtml(unitText)}</td>
+        <td style="padding:7px 8px;border-bottom:1px solid #eee;text-align:${sA};vertical-align:top">${escapeHtml(uText)}</td>
         <td style="padding:7px 8px;border-bottom:1px solid #eee;text-align:${eA};vertical-align:top">${money(l.unit_price, currency)}</td>
         <td style="padding:7px 8px;border-bottom:1px solid #eee;text-align:${eA};vertical-align:top">${money(l.line_total, currency)}</td>
       </tr>`
@@ -157,8 +178,8 @@ function buildContainer({ quote, customer, lines, currency, lang }: QuoteExportA
     </table>
     <div style="display:flex;justify-content:${rtl ? 'flex-start' : 'flex-end'};margin-top:16px">
       <table style="font-size:14px">
-        <tr><td style="padding:4px 16px;color:#555">${escapeHtml(L.pdf.subtotal)}</td><td style="padding:4px 0;text-align:${eA};font-weight:600">${money(quote.subtotal, currency)}</td></tr>
-        <tr><td style="padding:8px 16px;font-weight:800;border-top:2px solid #C28E0E">${escapeHtml(L.pdf.total)}</td><td style="padding:8px 0;text-align:${eA};font-weight:800;color:#C28E0E;border-top:2px solid #C28E0E;font-size:17px">${money(quote.total, currency)}</td></tr>
+        <tr><td style="padding:4px 16px;color:#555">${escapeHtml(L.pdf.subtotal)}</td><td style="padding:4px 0;text-align:${eA};font-weight:600">${money(totals.subtotal, currency)}</td></tr>
+        <tr><td style="padding:8px 16px;font-weight:800;border-top:2px solid #C28E0E">${escapeHtml(L.pdf.total)}</td><td style="padding:8px 0;text-align:${eA};font-weight:800;color:#C28E0E;border-top:2px solid #C28E0E;font-size:17px">${money(totals.total, currency)}</td></tr>
       </table>
     </div>
     ${quote.notes ? `<div style="margin-top:18px"><div style="color:#6B6B6B;font-weight:700;text-transform:uppercase;font-size:11px">${escapeHtml(L.pdf.terms)}</div><div style="font-size:12px;color:#333;white-space:pre-wrap">${escapeHtml(quote.notes)}</div></div>` : ''}
@@ -263,17 +284,18 @@ export async function downloadQuoteDocx({ quote, customer, lines, currency, lang
     return new TableCell({ margins: { top: 60, bottom: 60, left: 80, right: 80 }, children: paras })
   }
 
-  const dataRows = lines
+  const visibleLines = lines.filter((l) => !isInternal(l))
+  const totals = totalsOf(visibleLines)
+  const dataRows = visibleLines
     .slice()
     .sort((a, b) => a.sort_order - b.sort_order)
     .map((l) => {
-      const info = lineInfo(l, lang)
       return new TableRow({
         children: [
           cell(l.is_installation ? L.quote.installation : l.brand_snapshot),
           descCell(l),
           cell(l.is_installation ? '' : Number(l.quantity).toLocaleString(), { alignment: endAlign }),
-          cell(info?.unit ?? unitLabel(L, l.unit)),
+          cell(unitText(l, lang, L)),
           cell(money(l.unit_price, currency), { alignment: endAlign }),
           cell(money(l.line_total, currency), { alignment: endAlign }),
         ],
@@ -318,8 +340,8 @@ export async function downloadQuoteDocx({ quote, customer, lines, currency, lang
     new Paragraph({ spacing: { after: 80 }, children: [] }),
     table,
     new Paragraph({ spacing: { after: 80 }, children: [] }),
-    para([run(`${L.pdf.subtotal}:  `, { color: '555555' }), run(money(quote.subtotal, currency), { bold: true })], { alignment: endAlign, after: 20 }),
-    para([run(`${L.pdf.total}:  `, { bold: true }), run(money(quote.total, currency), { bold: true, color: GOLD, size: 26 })], { alignment: endAlign, after: 160 }),
+    para([run(`${L.pdf.subtotal}:  `, { color: '555555' }), run(money(totals.subtotal, currency), { bold: true })], { alignment: endAlign, after: 20 }),
+    para([run(`${L.pdf.total}:  `, { bold: true }), run(money(totals.total, currency), { bold: true, color: GOLD, size: 26 })], { alignment: endAlign, after: 160 }),
   )
   if (quote.notes) {
     children.push(

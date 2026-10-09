@@ -179,13 +179,16 @@ export function QuoteEditorPage() {
       description_snapshot: p.description,
       unit: p.unit,
       quantity: p.quantity,
-      unit_price: 0,
+      unit_price: p.unitPrice ?? 0,
       commission_percent: null,
       fx_note: null,
       is_installation: false,
-      notes: p.formula,
-      calc_source: 'ENGINE',
-      calc_meta: { section: p.section, label: p.label, formula: p.formula, itemKey: p.itemKey, ...(p.meta ?? {}), inputs },
+      notes: p.isManual ? '' : p.formula,
+      calc_source: p.isManual ? 'MANUAL' : 'ENGINE',
+      calc_meta: {
+        section: p.section, label: p.label, formula: p.formula, itemKey: p.itemKey,
+        unitLabel: p.unitLabel, internal: p.internal ?? false, ...(p.meta ?? {}), inputs,
+      },
     }))
     setLines((prev) => [...prev, ...newLines])
     setShowCalc(false)

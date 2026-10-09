@@ -84,6 +84,14 @@ export interface Proposal {
   /** Extra structured values carried onto the line's calc_meta (e.g. end sets). */
   meta?: Record<string, unknown>
   warning?: string
+  // --- set by the configurator UI (manual items, dealer extras) -------------
+  unitPrice?: number
+  /** Free-text unit label for manual items (overrides the enum unit). */
+  unitLabel?: string
+  /** Internal-only line: kept in your view, excluded from the customer PDF/Word. */
+  internal?: boolean
+  /** True for user-added manual / suggested-extra items (not engine output). */
+  isManual?: boolean
 }
 
 /** A display-only computed metric for the engineering report. */
@@ -237,8 +245,9 @@ export function runEngine(input: CalcInputs, data: EngineData): CalcResult {
     })
   }
 
-  // Effective line length = house length − front/back clearance (1.5 m each end).
-  const clearance = get('house_end_clearance_m', get('pipe_clearance_total_m', 3))
+  // Feeding/drinking line length = house length − clearance (motor + hopper at
+  // the ends). Default 6 m (3 front + 3 back), configurable via feed_line_clearance_m.
+  const clearance = get('feed_line_clearance_m', 6)
   const effLen = Math.max(0, round(L - clearance, 2))
 
   // ---- Feeding (ROXELL NEW MiniMax pan feeder) -----------------------------
@@ -258,9 +267,10 @@ export function runEngine(input: CalcInputs, data: EngineData): CalcResult {
       `eff. ${fmt(effLen, 1)} m → ${feedPipesPerLine} pipes/line (≈${fmt(feedLineLen, 1)} m) → ${feedTotalPipes} pipes total`,
       { itemKey: 'FEEDING' },
     )
+    metrics.push({ section: 'Feeding & drinking', label: 'Feeding line length', value: effLen, unit: 'm', formula: `${fmt(L)} − ${clearance} m clearance = ${fmt(effLen, 1)} m` })
     metrics.push({ section: 'Feeding & drinking', label: 'Feed pipes per line', value: feedPipesPerLine, unit: 'pipes', formula: `ceil(${fmt(effLen, 1)} / ${feedPipe}) = ${feedPipesPerLine}` })
     metrics.push({ section: 'Feeding & drinking', label: 'Feed pipes total', value: feedTotalPipes, unit: 'pipes', formula: `${feedPipesPerLine} × ${feedLines} lines = ${feedTotalPipes}` })
-    metrics.push({ section: 'Feeding & drinking', label: 'Feed line length', value: feedLineLen, unit: 'm', formula: `${feedPipesPerLine} × ${feedPipe} m` })
+    metrics.push({ section: 'Feeding & drinking', label: 'Feed piped length', value: feedLineLen, unit: 'm', formula: `${feedPipesPerLine} × ${feedPipe} m ≈ ${fmt(feedLineLen, 1)} m` })
   }
 
   // ---- Drinking (ROXELL nipple) --------------------------------------------
@@ -296,7 +306,8 @@ export function runEngine(input: CalcInputs, data: EngineData): CalcResult {
   // ---- Tunnel ventilation — cross-section × target airspeed (length-free) ---
   // tunnelFans = ceil(W × H_avg × airspeed × 3600 / capacity). Length must not
   // appear: same W×H_avg gives the same fan count for any house length.
-  const airspeed = get('tunnel_target_airspeed_ms', 2.6)
+  // Tunnel air speed: use the per-quote input when provided, else the setting.
+  const airspeed = input.tunnel_air_speed_ms ?? get('tunnel_target_airspeed_ms', 2.6)
   const crossSection = round(W * hAvg, 3)
   const tunnelAirflow = round(crossSection * airspeed * 3600)
   metrics.push({
