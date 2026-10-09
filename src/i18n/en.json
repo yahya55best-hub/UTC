@@ -207,6 +207,7 @@
     "weight": "Weight-based",
     "cage": "Cage geometry",
     "tunnelSpeed": "Tunnel air speed (m/s)",
+    "siloDays": "Silo days of storage",
     "openingHeight": "Tunnel opening height (m)",
     "density2": "Stocking density (kg/m²)",
     "targetWeight": "Target bird weight (kg)",

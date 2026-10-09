@@ -13,7 +13,7 @@
 
 import type {
   AirInletModel, CageModel, CalcSetting, CapacityMethod, CoolingPadModel,
-  FanModel, HeaterModel, HouseSystem, UnitType,
+  FanModel, HeaterModel, HouseSystem, SiloModel, UnitType,
 } from './types'
 
 const ceil = (n: number) => Math.ceil(n)
@@ -32,6 +32,7 @@ export interface EngineData {
   heaters: HeaterModel[]
   inlets: AirInletModel[]
   cages: CageModel[]
+  silos: SiloModel[]
   /** Resolve a brand_id to its display name (from the catalog). */
   brandName: (id: string | null) => string | null
 }
@@ -65,6 +66,8 @@ export interface CalcInputs {
   number_of_rows?: number
   tiers_per_row?: number
   end_clearance_m?: number
+  // silo
+  silo_days_storage?: number
   // lighting estimate
   lamp_rows?: number
 }
@@ -303,6 +306,43 @@ export function runEngine(input: CalcInputs, data: EngineData): CalcResult {
     metrics.push({ section: 'Feeding & drinking', label: 'End sets total', value: endSetsTotal, unit: 'sets', formula: `${endSetsPerLine} × ${waterLines} lines = ${endSetsTotal}` })
   }
 
+  // ---- Silo (Roxell) — feed storage sizing ---------------------------------
+  // required tons = birds × daily feed (kg) × days of storage / 1000. Picks the
+  // fewest silos from the available Roxell models (flex auger bundled in each).
+  if (birds != null && data.silos.length > 0) {
+    const dailyFeed = get('daily_feed_kg_per_bird', 0.17)
+    const days = input.silo_days_storage ?? 3
+    const requiredTons = round((birds * dailyFeed * days) / 1000, 2)
+    metrics.push({ section: 'Feeding & drinking', label: 'Feed storage required', value: requiredTons, unit: 'tons', formula: `${fmt(birds)} birds × ${dailyFeed} kg × ${days} days / 1000 = ${fmt(requiredTons, 2)} t` })
+    const models = [...data.silos].filter((s) => s.active && (s.capacity_tons ?? 0) > 0).sort((a, b) => b.capacity_tons - a.capacity_tons)
+    if (models.length > 0) {
+      const big = models[0]
+      const small = models[models.length - 1]
+      let nBig = floor(requiredTons / big.capacity_tons)
+      const rem = round(requiredTons - nBig * big.capacity_tons, 2)
+      let nSmall = 0
+      if (rem > 0.001) {
+        if (small.id !== big.id && rem <= small.capacity_tons) nSmall = 1
+        else nBig += 1
+      }
+      if (nBig > 0) {
+        addProposal(
+          proposals, 'Feeding & drinking', 'Silo', data.brandName(big.brand_id) ?? 'Roxell', big.name, 'PER_UNIT', nBig,
+          `${fmt(requiredTons, 1)} t storage → ${nBig} × ${big.name} (${big.capacity_tons} t)`,
+          { itemKey: 'SILO', unitPrice: big.price_egp ?? undefined, unitLabel: 'silo', meta: { capacity_tons: big.capacity_tons, price_currency: 'EGP' } },
+        )
+      }
+      if (nSmall > 0) {
+        addProposal(
+          proposals, 'Feeding & drinking', 'Silo (small)', data.brandName(small.brand_id) ?? 'Roxell', small.name, 'PER_UNIT', nSmall,
+          `remainder ${fmt(rem, 1)} t → ${nSmall} × ${small.name} (${small.capacity_tons} t)`,
+          { itemKey: 'SILO', unitPrice: small.price_egp ?? undefined, unitLabel: 'silo', meta: { capacity_tons: small.capacity_tons, price_currency: 'EGP' } },
+        )
+      }
+      metrics.push({ section: 'Feeding & drinking', label: 'Silos selected', value: nBig + nSmall, unit: 'silos', formula: `${nBig}×${big.capacity_tons}t${nSmall ? ` + ${nSmall}×${small.capacity_tons}t` : ''}` })
+    }
+  }
+
   // ---- Tunnel ventilation — cross-section × target airspeed (length-free) ---
   // tunnelFans = ceil(W × H_avg × airspeed × 3600 / capacity). Length must not
   // appear: same W×H_avg gives the same fan count for any house length.
@@ -513,7 +553,10 @@ function addProposal(
   unit: UnitType,
   quantity: number,
   formula: string,
-  opts: { itemKey?: string; warning?: string; meta?: Record<string, unknown> } = {},
+  opts: {
+    itemKey?: string; warning?: string; meta?: Record<string, unknown>
+    unitPrice?: number; unitLabel?: string
+  } = {},
 ) {
   arr.push({
     key: `${section}:${label}`.replace(/\s+/g, '_'),
@@ -527,5 +570,7 @@ function addProposal(
     itemKey: opts.itemKey,
     meta: opts.meta,
     warning: opts.warning,
+    unitPrice: opts.unitPrice,
+    unitLabel: opts.unitLabel,
   })
 }

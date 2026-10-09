@@ -112,7 +112,7 @@ export function HouseSizingPanel({
   const engineData: EngineData = useMemo(
     () => ({
       settings: eng.settings, fans: eng.fans, pads: eng.pads, heaters: eng.heaters,
-      inlets: eng.inlets, cages: eng.cages,
+      inlets: eng.inlets, cages: eng.cages, silos: eng.silos,
       brandName: (id) => brands.find((b) => b.id === id)?.name ?? null,
     }),
     [eng, brands],
@@ -235,6 +235,9 @@ export function HouseSizingPanel({
         </Field>
         <Field label={t('calc.tunnelSpeed')}>
           <input className="input tabular" type="number" step="any" value={inp.tunnel_air_speed_ms ?? ''} onChange={(e) => set('tunnel_air_speed_ms', num(e.target.value))} />
+        </Field>
+        <Field label={t('calc.siloDays')}>
+          <input className="input tabular" type="number" step="any" value={inp.silo_days_storage ?? 3} onChange={(e) => set('silo_days_storage', num(e.target.value))} />
         </Field>
         {inp.capacity_method === 'WEIGHT' && (
           <>

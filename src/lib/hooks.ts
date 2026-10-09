@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { supabase } from './supabase'
 import type {
   AirInletModel, Brand, CageModel, CalcSetting, CoolingPadModel, FanModel, FxRate,
-  HeaterModel, PriceListEntry, Product, ProductPricingVariant,
+  HeaterModel, PriceListEntry, Product, ProductPricingVariant, SiloModel,
 } from './types'
 
 export interface Catalog {
@@ -59,9 +59,10 @@ export interface EngineTables {
   heaters: HeaterModel[]
   inlets: AirInletModel[]
   cages: CageModel[]
+  silos: SiloModel[]
 }
 
-const EMPTY_ENGINE: EngineTables = { settings: [], fans: [], pads: [], heaters: [], inlets: [], cages: [] }
+const EMPTY_ENGINE: EngineTables = { settings: [], fans: [], pads: [], heaters: [], inlets: [], cages: [], silos: [] }
 
 export function useEngineTables() {
   const [data, setData] = useState<EngineTables>(EMPTY_ENGINE)
@@ -70,13 +71,14 @@ export function useEngineTables() {
 
   const reload = useCallback(async () => {
     setLoading(true)
-    const [settings, fans, pads, heaters, inlets, cages] = await Promise.all([
+    const [settings, fans, pads, heaters, inlets, cages, silos] = await Promise.all([
       supabase.from('calc_settings').select('*').order('category').order('key'),
       supabase.from('fan_models').select('*').order('fan_type').order('name'),
       supabase.from('cooling_pad_models').select('*').order('name'),
       supabase.from('heater_models').select('*').order('name'),
       supabase.from('air_inlet_models').select('*').order('name'),
       supabase.from('cage_models').select('*').order('name'),
+      supabase.from('silo_models').select('*').order('capacity_tons', { ascending: false }),
     ])
     const err =
       settings.error || fans.error || pads.error || heaters.error || inlets.error || cages.error
@@ -88,6 +90,7 @@ export function useEngineTables() {
       heaters: (heaters.data as HeaterModel[]) ?? [],
       inlets: (inlets.data as AirInletModel[]) ?? [],
       cages: (cages.data as CageModel[]) ?? [],
+      silos: (silos.data as SiloModel[]) ?? [],
     })
     setLoading(false)
   }, [])

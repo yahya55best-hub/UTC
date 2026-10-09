@@ -219,6 +219,16 @@ export interface AirInletModel {
   notes: string | null
 }
 
+export interface SiloModel {
+  id: string
+  name: string
+  capacity_tons: number
+  price_egp: number | null
+  brand_id: string | null
+  active: boolean
+  notes: string | null
+}
+
 export interface CageModel {
   id: string
   name: string

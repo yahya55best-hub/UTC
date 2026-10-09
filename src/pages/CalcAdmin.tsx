@@ -183,6 +183,18 @@ export function CalcAdminPage() {
         onDelete={(id) => del('cage_models', id)}
       />
 
+      {/* Silo models */}
+      <EquipTable
+        title="Silo models (feed storage)"
+        rows={eng.silos}
+        cols={[
+          { label: 'capacity tons', field: 'capacity_tons', table: 'silo_models' },
+          { label: 'price EGP', field: 'price_egp', table: 'silo_models' },
+        ]}
+        onCommit={updateRow}
+        onDelete={(id) => del('silo_models', id)}
+      />
+
       {addingFan && <AddFanModal onClose={() => setAddingFan(false)} onSaved={() => { setAddingFan(false); eng.reload() }} />}
     </div>
   )
