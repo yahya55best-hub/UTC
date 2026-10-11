@@ -16,6 +16,10 @@ import type {
   FanModel, HeaterModel, HouseSystem, SiloModel, UnitType,
 } from './types'
 
+// Tunnel-fan sizing divisor: required air volume = L × W × H_avg × speed × 3600 / TUNNEL_FACTOR.
+// Overridable via the `tunnel_factor` row in calc_settings.
+export const DEFAULT_TUNNEL_FACTOR = 100
+
 const ceil = (n: number) => Math.ceil(n)
 const floor = (n: number) => Math.floor(n)
 const round = (n: number, d = 0) => {
@@ -343,26 +347,28 @@ export function runEngine(input: CalcInputs, data: EngineData): CalcResult {
     }
   }
 
-  // ---- Tunnel ventilation — cross-section × target airspeed (length-free) ---
-  // tunnelFans = ceil(W × H_avg × airspeed × 3600 / capacity). Length must not
-  // appear: same W×H_avg gives the same fan count for any house length.
-  // Tunnel air speed: use the per-quote input when provided, else the setting.
+  // ---- Tunnel ventilation — length-based ------------------------------------
+  // required = L × W × H_avg × air_speed × 3600 / tunnel_factor ; fans = ceil(required / capacity)
+  // (tunnel fans only — side-wall / minimum ventilation use their own ACH rule below)
+  const tunnelFactor = get('tunnel_factor', DEFAULT_TUNNEL_FACTOR)
   const airspeed = input.tunnel_air_speed_ms ?? get('tunnel_target_airspeed_ms', 2.6)
-  const crossSection = round(W * hAvg, 3)
-  const tunnelAirflow = round(crossSection * airspeed * 3600)
+  const heightUsed = input.ridge_height_m
+    ? `avg(ridge ${fmt(input.ridge_height_m, 2)}, side-wall ${fmt(input.eave_height_m, 2)}) = ${fmt(hAvg, 2)} m`
+    : `${fmt(hAvg, 2)} m (single height)`
+  const tunnelRequired = (L * W * hAvg * airspeed * 3600) / tunnelFactor
   metrics.push({
     section: 'Ventilation',
-    label: 'Tunnel cross-section',
-    value: crossSection,
-    unit: 'm²',
-    formula: `${fmt(W)} × ${fmt(hAvg, 2)} (H_avg) = ${fmt(crossSection, 2)} m²`,
+    label: 'Tunnel average height used',
+    value: hAvg,
+    unit: 'm',
+    formula: heightUsed,
   })
   metrics.push({
     section: 'Ventilation',
-    label: 'Tunnel design airflow',
-    value: tunnelAirflow,
+    label: 'Tunnel required air volume (÷ factor)',
+    value: round(tunnelRequired, 1),
     unit: 'm³/h',
-    formula: `${fmt(crossSection, 2)} × ${airspeed} m/s × 3600 = ${fmt(tunnelAirflow)} m³/h`,
+    formula: `${fmt(L)} × ${fmt(W)} × ${fmt(hAvg, 2)} × ${airspeed} m/s × 3600 / ${tunnelFactor} = ${fmt(tunnelRequired, 1)}`,
   })
   const tunnelFan = data.fans.find((f) => f.id === input.tunnel_fan_model_id)
   let tunnelFanCount: number | null = null
@@ -370,11 +376,19 @@ export function runEngine(input: CalcInputs, data: EngineData): CalcResult {
     if (tunnelFan.capacity_m3h == null) {
       warnings.push(`Tunnel fan "${tunnelFan.name}" has no capacity (m³/h) set — set it before sizing.`)
     } else {
-      tunnelFanCount = ceil(tunnelAirflow / tunnelFan.capacity_m3h)
+      const fansRaw = tunnelRequired / tunnelFan.capacity_m3h
+      tunnelFanCount = ceil(round(fansRaw, 6))
+      metrics.push({
+        section: 'Ventilation',
+        label: 'Tunnel fans (unrounded)',
+        value: round(fansRaw, 3),
+        unit: 'fans',
+        formula: `${fmt(tunnelRequired, 1)} / ${fmt(tunnelFan.capacity_m3h)} = ${fmt(fansRaw, 3)} → round up → ${tunnelFanCount}`,
+      })
       addProposal(
         proposals, 'Ventilation', 'Tunnel fans', brandName(data, tunnelFan.brand_id),
         `${tunnelFan.name} — tunnel fan`, 'PER_UNIT', tunnelFanCount,
-        `ceil(${fmt(tunnelAirflow)} / ${fmt(tunnelFan.capacity_m3h)}) = ${tunnelFanCount}`,
+        `(${fmt(L)} × ${fmt(W)} × ${fmt(hAvg, 2)} × ${airspeed} × 3600 / ${tunnelFactor}) / ${fmt(tunnelFan.capacity_m3h)} = ${fmt(fansRaw, 3)} → ${tunnelFanCount}`,
         { itemKey: 'TUNNEL_FAN' },
       )
     }
