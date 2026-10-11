@@ -85,6 +85,10 @@ export function AdminOverviewPage() {
     const v = r.currency === 'EUR' ? r.total_quoted : convert(fx, r.total_quoted, r.currency, 'EUR')
     return s + (v ?? 0)
   }, 0)
+  const eurThisMonth = valueByCurrency.reduce((s, r) => {
+    const v = r.currency === 'EUR' ? r.total_this_month : convert(fx, r.total_this_month, r.currency, 'EUR')
+    return s + (v ?? 0)
+  }, 0)
   const totalQuoted = valueByCurrency.reduce((s, r) => s + r.total_quoted, 0)
   const totalAccepted = valueByCurrency.reduce((s, r) => s + r.total_accepted, 0)
   const winRate = totalQuoted > 0 ? Math.round((totalAccepted / totalQuoted) * 100) : 0
@@ -104,6 +108,7 @@ export function AdminOverviewPage() {
       {/* Money */}
       <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-gold-700">{t('admin.money')}</h2>
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <Stat label={t('dashboard.valueThisMonth')} value={money(eurThisMonth, 'EUR')} hint={t('admin.thisMonth')} />
         <Stat label={t('admin.eurEq')} value={money(eurEquiv, 'EUR')} hint={t('admin.allTime')} />
         <Stat label={t('admin.winRate')} value={`${winRate}%`} hint={`${t('admin.accepted')} / ${t('admin.quoted')}`} />
         {valueByCurrency.map((r) => (
